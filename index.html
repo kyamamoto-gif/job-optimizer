@@ -217,6 +217,28 @@ tr:hover td{background:rgba(129,140,248,.04)}
     </div>
   </div>
 
+  <!-- KEN_ALL.CSV アップロード（共通） -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-title">〒 郵便番号CSVを読み込む（KEN_ALL.CSV）</div>
+    <div class="txt-sm" style="margin-bottom:10px">
+      <a href="https://www.post.japanpost.jp/zipcode/dl/kogaki-zip.html" target="_blank" style="color:var(--accent)">日本郵便サイト</a>から「全国一括」をダウンロード・解凍して <code style="background:var(--surface2);padding:2px 6px;border-radius:4px">KEN_ALL.CSV</code> を選択してください
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <div class="file-slot" id="kenSlot" onclick="triggerFile('kenInput')"
+        ondragover="event.preventDefault();this.classList.add('drag')"
+        ondragleave="this.classList.remove('drag')"
+        ondrop="dropKenFile(event)"
+        style="flex:1;min-width:200px;padding:14px;text-align:left;display:flex;align-items:center;gap:12px">
+        <span style="font-size:24px">〒</span>
+        <div>
+          <div style="font-size:13px;font-weight:500" id="kenFileName">KEN_ALL.CSV を選択</div>
+          <div class="txt-xs" id="kenFileStatus">未読み込み（なしでも動作しますが郵便番号は空欄になります）</div>
+        </div>
+      </div>
+      <input type="file" id="kenInput" accept=".csv,.CSV" style="display:none" onchange="loadKenAll(event)">
+    </div>
+  </div>
+
   <!-- 入力方式切り替え -->
   <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:16px;width:fit-content">
     <button class="vt-btn on" id="inputTabPaste" onclick="switchInputTab('paste')" style="padding:10px 22px;font-size:13px">📋 スプシからコピペ</button>
@@ -493,13 +515,15 @@ const S = {
   jobWB: null,  jobFile: null,
   addrPasteRows: [],
   jobPasteRows: [],
-  inputTab: 'paste',   // 'paste' | 'file'
+  inputTab: 'paste',
   fmt: '700',
   mode: 'addr',
   tone: 'standard',
   addrResult: [],
   jobResult: [],
-  viewMode: 'card'
+  viewMode: 'card',
+  kenAll: null,   // Map: '都道府県市区町村町域' → '郵便番号'
+  kenLoaded: false
 };
 
 // フォーマット定義
@@ -552,6 +576,104 @@ const FMT = {
 // FILE LOADING
 // ============================================================
 function triggerFile(id){ document.getElementById(id).click() }
+
+// ============================================================
+// KEN_ALL.CSV 読み込み・郵便番号突合
+// ============================================================
+function loadKenAll(ev){
+  const file = ev.target.files[0];
+  if(!file) return;
+  document.getElementById('kenFileStatus').textContent = '読み込み中...';
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      parseKenAll(e.target.result);
+      document.getElementById('kenFileName').textContent = file.name;
+      document.getElementById('kenFileStatus').textContent = `✅ ${S.kenAll.size.toLocaleString()}件の郵便番号を読み込みました`;
+      document.getElementById('kenSlot').classList.add('loaded');
+      toast('〒', `KEN_ALL読み込み完了（${S.kenAll.size.toLocaleString()}件）`);
+    } catch(err) {
+      document.getElementById('kenFileStatus').textContent = '⚠️ 読み込みエラー: ' + err.message;
+    }
+  };
+  // Shift-JISで読み込み
+  reader.readAsText(file, 'Shift-JIS');
+}
+
+function dropKenFile(ev){
+  ev.preventDefault();
+  ev.currentTarget.classList.remove('drag');
+  const file = ev.dataTransfer.files[0];
+  if(!file) return;
+  const fakeEv = { target: { files: [file] } };
+  loadKenAll(fakeEv);
+}
+
+function parseKenAll(text){
+  // KEN_ALL.CSV形式:
+  // 列0=全国地方公共団体コード, 列1=（旧）郵便番号, 列2=郵便番号,
+  // 列3=都道府県名カナ, 列4=市区町村名カナ, 列5=町域名カナ,
+  // 列6=都道府県名, 列7=市区町村名, 列8=町域名, ...
+  const map = new Map();
+  const lines = text.split('\n');
+  for(const line of lines){
+    if(!line.trim()) continue;
+    const cols = parseCSVLine(line);
+    if(cols.length < 9) continue;
+    const zip  = (cols[2]||'').replace(/"/g,'').trim();
+    const pref = (cols[6]||'').replace(/"/g,'').trim();
+    const city = (cols[7]||'').replace(/"/g,'').trim();
+    const town = (cols[8]||'').replace(/"/g,'').trim()
+      .replace(/以下に掲載がない場合/,'')
+      .replace(/（.*?）/g,'').replace(/\(.*?\)/g,'').trim();
+    if(!zip || !pref || !city) continue;
+    // キー1: 都道府県+市区町村+町域
+    const key1 = pref + city + town;
+    // キー2: 都道府県+市区町村（町域なし）
+    const key2 = pref + city;
+    if(!map.has(key1)) map.set(key1, zip);
+    if(!map.has(key2)) map.set(key2, zip); // 最初の1件だけ登録
+  }
+  S.kenAll = map;
+  S.kenLoaded = true;
+}
+
+function parseCSVLine(line){
+  const result = [];
+  let cur = '', inQ = false;
+  for(let i=0; i<line.length; i++){
+    const c = line[i];
+    if(c==='"'){ inQ=!inQ; }
+    else if(c===',' && !inQ){ result.push(cur); cur=''; }
+    else cur+=c;
+  }
+  result.push(cur);
+  return result;
+}
+
+// 都道府県市区町村・番地から郵便番号を検索
+function lookupZip(cityTown, banchi){
+  if(!S.kenAll || !cityTown) return '';
+  // cityTown例: '東京都新宿区新宿1丁目'
+  // KEN_ALLのキーと照合: 都道府県+市区町村+町域
+  const ct = cityTown.replace(/\s/g,'');
+
+  // 完全一致（都道府県+市区町村+町域まで）
+  if(S.kenAll.has(ct)) return S.kenAll.get(ct);
+
+  // 丁目を除いて照合（例: '東京都新宿区新宿'）
+  const noChome = ct.replace(/\d+丁目$/,'').replace(/\d+丁目/,'');
+  if(S.kenAll.has(noChome)) return S.kenAll.get(noChome);
+
+  // 市区町村まで（例: '東京都新宿区'）
+  const prefCityM = ct.match(/^(東京都|北海道|大阪府|京都府|.{2,3}県)(.+?[市区町村])/);
+  if(prefCityM){
+    const prefCity = prefCityM[1]+prefCityM[2];
+    if(S.kenAll.has(prefCity)) return S.kenAll.get(prefCity);
+  }
+
+  return '';
+}
 
 function loadFile(ev, type){
   const file = ev.target.files[0];
@@ -944,6 +1066,12 @@ async function processAddr(){
         warn = '要確認（住所データなし）';
       }
     }
+
+    // 郵便番号をKEN_ALLから取得（サーカス形式は既存J列優先）
+    if(!zip && S.kenLoaded) zip = lookupZip(cityTown, banchi);
+    const zipWarn = (cityTown && !zip) ? '郵便番号未取得' : '';
+    if(zipWarn && warn) warn += '・' + zipWarn;
+    else if(zipWarn) warn = zipWarn;
 
     S.addrResult.push({_no:no, 都道府県市区町村:cityTown, 番地:banchi, 建物名:building, 郵便番号:zip, _warn:warn});
     await sleep(2);
