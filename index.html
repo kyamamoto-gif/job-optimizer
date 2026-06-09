@@ -669,13 +669,11 @@ function fillPasteArea(type, rows){
 // ============================================================
 function selectFmt(f){
   S.fmt = f;
-  ['700','jobati','circus'].forEach(id=>{
-    document.getElementById('fmt'+id.charAt(0).toUpperCase()+id.slice(1)).classList.toggle('on', id===f);
-  });
+  document.getElementById('fmt700').classList.toggle('on', f==='700');
+  document.getElementById('fmtJobati').classList.toggle('on', f==='jobati');
+  document.getElementById('fmtCircus').classList.toggle('on', f==='circus');
   updateSidebarRules();
 }
-// capitalize first letter helper
-String.prototype.cap = function(){ return this.charAt(0).toUpperCase()+this.slice(1); };
 
 // ============================================================
 // SAMPLE DATA
@@ -759,9 +757,9 @@ function loadSampleJob(){
 // ============================================================
 function selectMode(m){
   S.mode = m;
-  ['addr','job','both'].forEach(id=>{
-    document.getElementById('mode'+id.charAt(0).toUpperCase()+id.slice(1)).classList.toggle('on', id===m);
-  });
+  document.getElementById('modeAddr').classList.toggle('on', m==='addr');
+  document.getElementById('modeJob').classList.toggle('on', m==='job');
+  document.getElementById('modeBoth').classList.toggle('on', m==='both');
   document.getElementById('modeWarning').style.display = (m==='job'||m==='both')?'block':'none';
 }
 
@@ -1418,7 +1416,8 @@ function downloadResult(){
 // UI HELPERS
 // ============================================================
 function goStep(n){
-  if(n>1 && !S.addrWB && !S.jobWB){ toast('⚠️','先にファイルを読み込むかサンプルを選択してください'); return; }
+  const hasData = S.addrWB || S.jobWB || S.addrPasteRows.length || S.jobPasteRows.length;
+  if(n>1 && !hasData){ toast('⚠️','先にデータを貼り付けるかファイルを読み込んでください'); return; }
   [1,2,3,4].forEach(i=>{
     document.getElementById('page'+i).classList.toggle('active', i===n);
     const tab = document.getElementById('tab'+i);
@@ -1428,7 +1427,6 @@ function goStep(n){
     const tn = document.getElementById('tn'+i);
     tn.textContent = i<n ? '✓' : i;
   });
-  // Show/hide settings panels
   if(n===3){
     const m = S.mode;
     document.getElementById('addrSettings').style.display = (m==='addr'||m==='both') ? 'block':'none';
@@ -1448,8 +1446,6 @@ function setProg(done, total, detail){
   document.getElementById('progText').textContent = `${done} / ${total}`;
   document.getElementById('progBar').style.width = total ? `${(done/total)*100}%` : '0%';
   document.getElementById('progDetail').textContent = detail;
-}
-
 }
 
 function updateSidebar(){
@@ -1498,7 +1494,7 @@ function copyResultTSV(){
   });
 }
 
-
+function toast(icon, msg){
   const t=document.getElementById('toast');
   document.getElementById('toastIcon').textContent=icon;
   document.getElementById('toastMsg').textContent=msg;
