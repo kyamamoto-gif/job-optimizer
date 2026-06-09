@@ -1,0 +1,1511 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>求人データ最適化ツール</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0c0c10;
+  --surface: #16161c;
+  --surface2: #1e1e26;
+  --surface3: #26262f;
+  --border: #2c2c38;
+  --border2: #3a3a48;
+  --accent: #818cf8;
+  --accent2: #34d399;
+  --accent3: #fbbf24;
+  --text: #e2e2f0;
+  --text2: #9090a8;
+  --text3: #55556a;
+  --danger: #f87171;
+  --r: 10px;
+  --rl: 14px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.6;min-height:100vh}
+
+/* ── Header ── */
+.hdr{display:flex;align-items:center;gap:14px;padding:16px 28px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:50}
+.logo{width:34px;height:34px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#fff;flex-shrink:0}
+.hdr-title{font-size:15px;font-weight:500}
+.hdr-badge{font-size:11px;font-family:'DM Mono',monospace;background:var(--surface2);border:1px solid var(--border);padding:3px 10px;border-radius:20px;color:var(--text2);margin-left:auto}
+
+/* ── Tabs ── */
+.tabs{display:flex;border-bottom:1px solid var(--border);background:var(--surface);padding:0 28px;gap:2px}
+.tab{padding:13px 18px;font-size:13px;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;display:flex;align-items:center;gap:8px;transition:.2s;white-space:nowrap;user-select:none}
+.tab:hover{color:var(--text2)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab.done{color:var(--text2)}
+.tnum{width:20px;height:20px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;font-family:'DM Mono',monospace;transition:.2s;flex-shrink:0}
+.tab.active .tnum{background:var(--accent);border-color:var(--accent);color:#fff}
+.tab.done .tnum{background:var(--accent2);border-color:var(--accent2);color:#0c0c10;font-size:12px}
+
+/* ── Layout ── */
+.layout{display:flex;height:calc(100vh - 107px)}
+.main{flex:1;overflow-y:auto;padding:28px 32px}
+.sidebar{width:320px;flex-shrink:0;background:var(--surface);border-left:1px solid var(--border);overflow-y:auto;padding:22px 20px}
+
+/* ── Page ── */
+.page{display:none}.page.active{display:block}
+.pg-title{font-size:18px;font-weight:500;letter-spacing:-.3px;margin-bottom:5px}
+.pg-sub{color:var(--text2);font-size:13px;margin-bottom:24px}
+
+/* ── Upload ── */
+.drop-zone{border:2px dashed var(--border2);border-radius:var(--rl);padding:44px 32px;text-align:center;cursor:pointer;transition:.2s;background:var(--surface)}
+.drop-zone:hover,.drop-zone.drag{border-color:var(--accent);background:rgba(129,140,248,.06)}
+.drop-icon{font-size:38px;margin-bottom:12px}
+.drop-title{font-size:16px;font-weight:500;margin-bottom:5px}
+.drop-sub{color:var(--text2);font-size:13px}
+.file-slots{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+.file-slot{background:var(--surface);border:1.5px dashed var(--border2);border-radius:var(--rl);padding:20px;cursor:pointer;transition:.2s;text-align:center}
+.file-slot:hover,.file-slot.drag{border-color:var(--accent);background:rgba(129,140,248,.05)}
+.file-slot.loaded{border-style:solid;border-color:var(--accent2);background:rgba(52,211,153,.05)}
+.slot-icon{font-size:28px;margin-bottom:8px}
+.slot-name{font-size:13px;font-weight:500;margin-bottom:4px}
+.slot-sub{font-size:11px;color:var(--text2)}
+.slot-file{font-size:11px;color:var(--accent2);margin-top:6px;font-family:'DM Mono',monospace;word-break:break-all}
+
+/* ── Card ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:20px;margin-bottom:16px}
+.card-title{font-size:12px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.8px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+
+/* ── Form ── */
+select,input[type=text],input[type=password],textarea{background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:var(--r);padding:8px 12px;font-size:13px;font-family:'Noto Sans JP',sans-serif;outline:none;width:100%;transition:border .15s}
+select:focus,input:focus,textarea:focus{border-color:var(--accent)}
+textarea{resize:vertical;min-height:70px;line-height:1.7}
+.field{margin-bottom:12px}
+.field-label{font-size:12px;color:var(--text2);margin-bottom:5px}
+.row-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+/* ── Buttons ── */
+.btn{display:inline-flex;align-items:center;gap:7px;padding:9px 18px;border-radius:var(--r);font-size:13px;font-weight:500;font-family:'Noto Sans JP',sans-serif;cursor:pointer;border:none;transition:.2s}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:#6366f1;transform:translateY(-1px)}
+.btn-primary:disabled{background:var(--text3);cursor:not-allowed;transform:none}
+.btn-outline{background:transparent;border:1px solid var(--border2);color:var(--text2)}
+.btn-outline:hover{border-color:var(--accent);color:var(--accent)}
+.btn-success{background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.25);color:var(--accent2)}
+.btn-success:hover{background:rgba(52,211,153,.22)}
+.btn-lg{padding:13px 26px;font-size:14px}
+.btn-row{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap;align-items:center}
+
+/* ── Pill / badge ── */
+.pill{display:inline-flex;align-items:center;padding:5px 13px;border:1px solid var(--border);border-radius:20px;font-size:12px;cursor:pointer;transition:.2s;color:var(--text2)}
+.pill:hover{border-color:var(--accent);color:var(--accent)}
+.pill.on{background:rgba(129,140,248,.18);border-color:var(--accent);color:var(--accent)}
+.pills{display:flex;flex-wrap:wrap;gap:8px}
+.badge{display:inline-flex;align-items:center;font-size:10px;padding:2px 8px;border-radius:20px;font-family:'DM Mono',monospace}
+.b-purple{background:rgba(129,140,248,.18);color:var(--accent)}
+.b-teal{background:rgba(52,211,153,.14);color:var(--accent2)}
+.b-amber{background:rgba(251,191,36,.14);color:var(--accent3)}
+.b-red{background:rgba(248,113,113,.14);color:var(--danger)}
+
+/* ── Progress ── */
+.prog-wrap{height:4px;background:var(--surface2);border-radius:2px;overflow:hidden;margin:8px 0}
+.prog-bar{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:2px;transition:width .3s}
+
+/* ── Stats grid ── */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:22px}
+.stat{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:14px}
+.stat-val{font-size:22px;font-weight:700;font-family:'DM Mono',monospace}
+.stat-lbl{font-size:11px;color:var(--text2);margin-top:2px}
+
+/* ── Table ── */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--r)}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:var(--surface2);padding:9px 12px;text-align:left;color:var(--text2);font-weight:500;border-bottom:1px solid var(--border);white-space:nowrap;font-family:'DM Mono',monospace;font-size:11px}
+td{padding:9px 12px;border-bottom:1px solid var(--border);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:top}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(129,140,248,.04)}
+.td-new{color:var(--accent2)}
+.td-ai{color:var(--accent3)}
+.td-err{color:var(--danger)}
+
+/* ── Preview card ── */
+.job-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--rl);padding:16px;margin-bottom:12px;cursor:pointer;transition:.2s}
+.job-card:hover{border-color:var(--accent2)}
+.job-card.sel{border-color:var(--accent);background:rgba(129,140,248,.07)}
+.jc-no{font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;margin-bottom:4px}
+.jc-title{font-size:13px;font-weight:500;margin-bottom:8px;line-height:1.4}
+.jc-body{font-size:11px;color:var(--text2);line-height:1.7;white-space:pre-wrap;max-height:80px;overflow:hidden}
+.jc-addr{display:flex;gap:5px;flex-wrap:wrap;margin-top:10px}
+.addr-chip{font-size:10px;font-family:'DM Mono',monospace;padding:2px 8px;background:var(--surface);border:1px solid var(--border);border-radius:4px}
+
+/* ── Sidebar ── */
+.sb-section{margin-bottom:22px}
+.sb-label{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);margin-bottom:10px}
+.rule-line{font-size:11px;color:var(--text2);line-height:1.9;display:flex;gap:8px;align-items:flex-start}
+
+/* ── API key area ── */
+.api-notice{background:rgba(251,191,36,.07);border:1px solid rgba(251,191,36,.2);border-radius:var(--r);padding:11px 14px;font-size:12px;color:var(--accent3);margin-bottom:14px}
+
+/* ── Toast ── */
+.toast{position:fixed;bottom:22px;right:22px;background:var(--surface);border:1px solid var(--border2);border-radius:var(--r);padding:11px 18px;font-size:13px;display:flex;align-items:center;gap:9px;z-index:200;transform:translateY(70px);opacity:0;transition:.3s;box-shadow:0 8px 28px rgba(0,0,0,.5)}
+.toast.show{transform:translateY(0);opacity:1}
+
+/* ── Toggle ── */
+.view-toggle{display:flex;gap:0;border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.vt-btn{padding:7px 14px;font-size:12px;cursor:pointer;background:transparent;border:none;color:var(--text2);transition:.15s;font-family:'Noto Sans JP',monospace}
+.vt-btn.on{background:var(--surface2);color:var(--text)}
+
+/* ── Mode selector ── */
+.mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
+.mode-card{background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--rl);padding:18px;cursor:pointer;transition:.2s;text-align:center}
+.mode-card:hover{border-color:var(--accent)}
+.mode-card.on{border-color:var(--accent);background:rgba(129,140,248,.08)}
+.mode-icon{font-size:28px;margin-bottom:8px}
+.mode-name{font-size:13px;font-weight:500;margin-bottom:4px}
+.mode-desc{font-size:11px;color:var(--text2)}
+
+/* misc */
+.hr{border:none;border-top:1px solid var(--border);margin:18px 0}
+.mt8{margin-top:8px}.mt16{margin-top:16px}.mt4{margin-top:4px}
+.txt-sm{font-size:12px;color:var(--text2)}
+.txt-xs{font-size:11px;color:var(--text3)}
+.empty{text-align:center;padding:36px;color:var(--text3);font-size:13px}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--accent3);animation:pulse 1.4s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.2}}
+.spin{display:inline-block;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="logo">求</div>
+  <span class="hdr-title">求人データ最適化ツール</span>
+  <span class="hdr-badge">Excel対応版 v2.0</span>
+</div>
+
+<div class="tabs">
+  <div class="tab active" id="tab1" onclick="goStep(1)"><div class="tnum" id="tn1">1</div>ファイル選択</div>
+  <div class="tab" id="tab2" onclick="goStep(2)"><div class="tnum" id="tn2">2</div>処理モード選択</div>
+  <div class="tab" id="tab3" onclick="goStep(3)"><div class="tnum" id="tn3">3</div>設定・実行</div>
+  <div class="tab" id="tab4" onclick="goStep(4)"><div class="tnum" id="tn4">4</div>プレビュー・ダウンロード</div>
+</div>
+
+<div class="layout">
+<div class="main">
+
+<!-- ===== STEP 1: データ入力 ===== -->
+<div class="page active" id="page1">
+  <div class="pg-title">データを入力</div>
+  <div class="pg-sub">スプレッドシートからコピペ、またはExcelファイルをアップロードしてください。</div>
+
+  <!-- フォーマット選択 -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-title">📋 住所フォーマットを選択</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+      <div class="mode-card on" id="fmt700" onclick="selectFmt('700')">
+        <div class="mode-icon">🗂</div>
+        <div class="mode-name">700形式</div>
+        <div class="mode-desc">C列メイン（B列参考）<br>→ E/F/G/H列に出力</div>
+      </div>
+      <div class="mode-card" id="fmtJobati" onclick="selectFmt('jobati')">
+        <div class="mode-icon">📌</div>
+        <div class="mode-name">ジョバティ形式</div>
+        <div class="mode-desc">B列のみ<br>→ D/E/F/G列に出力</div>
+      </div>
+      <div class="mode-card" id="fmtCircus" onclick="selectFmt('circus')">
+        <div class="mode-icon">🎪</div>
+        <div class="mode-name">サーカス形式</div>
+        <div class="mode-desc">B〜F列（優先度あり）<br>→ G/H/I/J列に出力</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 入力方式切り替え -->
+  <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:16px;width:fit-content">
+    <button class="vt-btn on" id="inputTabPaste" onclick="switchInputTab('paste')" style="padding:10px 22px;font-size:13px">📋 スプシからコピペ</button>
+    <button class="vt-btn" id="inputTabFile" onclick="switchInputTab('file')" style="padding:10px 22px;font-size:13px">📁 Excelアップロード</button>
+  </div>
+
+  <!-- ===== コピペ入力 ===== -->
+  <div id="pasteInputArea">
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-title">📍 住所データ（スプシからコピペ）</div>
+      <div class="txt-sm" style="margin-bottom:10px">スプレッドシートで住所シートの<strong>全体を選択（Ctrl+A）→ コピー（Ctrl+C）</strong>して下に貼り付けてください</div>
+      <textarea id="addrPasteArea" placeholder="ここにスプレッドシートのデータを貼り付け（Ctrl+V）&#10;&#10;タブ区切りのまま貼り付けるとOKです。ヘッダー行も含めて貼り付けてください。"
+        style="min-height:120px;font-family:'DM Mono',monospace;font-size:11px"
+        oninput="onPasteInput('addr')"></textarea>
+      <div id="addrPastePreview" class="txt-xs mt8" style="color:var(--accent2)"></div>
+    </div>
+
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-title">💼 仕事内容データ（任意・コピペ）</div>
+      <div class="txt-sm" style="margin-bottom:10px">仕事内容シートの<strong>A列全体をコピー</strong>して貼り付けてください（AIリライトを使う場合のみ）</div>
+      <textarea id="jobPasteArea" placeholder="ここに仕事内容データを貼り付け（1行1件）"
+        style="min-height:100px;font-family:'DM Mono',monospace;font-size:11px"
+        oninput="onPasteInput('job')"></textarea>
+      <div id="jobPastePreview" class="txt-xs mt8" style="color:var(--accent2)"></div>
+    </div>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:4px">
+      <button class="btn btn-outline" onclick="loadSampleAddr()">📍 住所サンプルを貼り付ける</button>
+      <button class="btn btn-outline" onclick="loadSampleJob()">💼 仕事内容サンプルを貼り付ける</button>
+    </div>
+  </div>
+
+  <!-- ===== Excelアップロード ===== -->
+  <div id="fileInputArea" style="display:none">
+    <div class="file-slots">
+      <div class="file-slot" id="addrSlot"
+        onclick="triggerFile('addrInput')"
+        ondragover="event.preventDefault();this.classList.add('drag')"
+        ondragleave="this.classList.remove('drag')"
+        ondrop="dropFile(event,'addr')">
+        <div class="slot-icon">📍</div>
+        <div class="slot-name">住所ファイル</div>
+        <div class="slot-sub">Sheet1のデータをルールに沿って分割</div>
+        <div class="slot-file" id="addrFileName">未選択</div>
+      </div>
+      <div class="file-slot" id="jobSlot"
+        onclick="triggerFile('jobInput')"
+        ondragover="event.preventDefault();this.classList.add('drag')"
+        ondragleave="this.classList.remove('drag')"
+        ondrop="dropFile(event,'job')">
+        <div class="slot-icon">💼</div>
+        <div class="slot-name">仕事内容ファイル（任意）</div>
+        <div class="slot-sub">A列の元データをAIで<br>魅力的な原稿に変換</div>
+        <div class="slot-file" id="jobFileName">未選択</div>
+      </div>
+    </div>
+    <input type="file" id="addrInput" accept=".xlsx" style="display:none" onchange="loadFile(event,'addr')">
+    <input type="file" id="jobInput" accept=".xlsx" style="display:none" onchange="loadFile(event,'job')">
+    <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-outline" onclick="loadSampleAddr()">📍 住所サンプルを読み込む</button>
+      <button class="btn btn-outline" onclick="loadSampleJob()">💼 仕事内容サンプルを読み込む</button>
+    </div>
+  </div>
+
+  <div class="btn-row" style="margin-top:20px">
+    <button class="btn btn-primary btn-lg" onclick="goStep(2)" id="step1Next" disabled>次へ：処理モード選択 →</button>
+  </div>
+</div>
+
+<!-- ===== STEP 2: モード選択 ===== -->
+<div class="page" id="page2">
+  <div class="pg-title">処理モードを選択</div>
+  <div class="pg-sub">実行する処理を選んでください</div>
+
+  <div class="mode-grid">
+    <div class="mode-card on" id="modeAddr" onclick="selectMode('addr')">
+      <div class="mode-icon">📍</div>
+      <div class="mode-name">住所分割のみ</div>
+      <div class="mode-desc">選択したフォーマットのルールで住所を分割</div>
+    </div>
+    <div class="mode-card" id="modeJob" onclick="selectMode('job')">
+      <div class="mode-icon">✨</div>
+      <div class="mode-name">仕事内容AIリライト</div>
+      <div class="mode-desc">求人原稿をAIで魅力的な文章に変換</div>
+    </div>
+    <div class="mode-card" id="modeBoth" onclick="selectMode('both')">
+      <div class="mode-icon">🚀</div>
+      <div class="mode-name">両方まとめて処理</div>
+      <div class="mode-desc">住所分割 + AIリライトを一括処理</div>
+    </div>
+  </div>
+
+  <div id="modeWarning" style="display:none" class="api-notice">
+    ⚠️ AIリライトにはAnthropicのAPIキーが必要です（次のステップで入力）
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-outline" onclick="goStep(1)">← 戻る</button>
+    <button class="btn btn-primary btn-lg" onclick="goStep(3)">次へ：設定・実行 →</button>
+  </div>
+</div>
+
+<!-- ===== STEP 3: 設定・実行 ===== -->
+<div class="page" id="page3">
+  <div class="pg-title">設定・実行</div>
+  <div class="pg-sub">処理の詳細設定をして実行してください</div>
+
+  <!-- 住所設定 -->
+  <div id="addrSettings" class="card">
+    <div class="card-title">📍 住所分割の設定</div>
+    <div class="row-2">
+      <div class="field">
+        <div class="field-label">住所データシート名</div>
+        <select id="addrSheet"><option>Sheet1</option></select>
+      </div>
+      <div class="field">
+        <div class="field-label">ヘッダー行数</div>
+        <select id="addrHeaderRows">
+          <option value="2" selected>2行（添付ファイルのデフォルト）</option>
+          <option value="1">1行</option>
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <div class="field-label">処理方式</div>
+      <div class="pills">
+        <div class="pill on" onclick="togglePill(this,'addrOpts','priority')">優先度ルール適用</div>
+        <div class="pill" onclick="togglePill(this,'addrOpts','normalize')">全角→半角正規化</div>
+        <div class="pill on" onclick="togglePill(this,'addrOpts','zipremove')">郵便番号除去</div>
+        <div class="pill on" onclick="togglePill(this,'addrOpts','fullwidth')">全角数字→半角</div>
+      </div>
+    </div>
+    <input type="hidden" id="addrOpts" value="priority,zipremove,fullwidth">
+  </div>
+
+  <!-- AIリライト設定 -->
+  <div id="aiSettings" class="card" style="display:none">
+    <div class="card-title">✨ AIリライトの設定</div>
+    <div class="api-notice">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="dot"></div>
+        APIキーはブラウザ内のみで使用され、外部サーバーには送信されません
+      </div>
+    </div>
+    <div class="field">
+      <div class="field-label">Anthropic APIキー</div>
+      <input type="password" id="apiKey" placeholder="sk-ant-api03-...">
+    </div>
+    <div class="row-2">
+      <div class="field">
+        <div class="field-label">最大処理件数</div>
+        <select id="maxRows">
+          <option value="5">5件（テスト）</option>
+          <option value="20">20件</option>
+          <option value="50">50件</option>
+          <option value="100" selected>100件</option>
+          <option value="9999">全件</option>
+        </select>
+      </div>
+      <div class="field">
+        <div class="field-label">仕事内容シート名</div>
+        <select id="jobSheet"><option>求人原稿</option></select>
+      </div>
+    </div>
+    <div class="field">
+      <div class="field-label">出力トーン</div>
+      <div class="pills">
+        <div class="pill on" id="tone_standard" onclick="setTone('standard')">📋 標準（ルール通り）</div>
+        <div class="pill" id="tone_friendly" onclick="setTone('friendly')">😊 フレンドリー重視</div>
+        <div class="pill" id="tone_pro" onclick="setTone('pro')">💼 プロフェッショナル</div>
+      </div>
+    </div>
+    <div class="field">
+      <div class="field-label">追加指示（任意）</div>
+      <textarea id="extraInst" placeholder="例：給与情報は変えずにそのまま含めること、週3日〜の柔軟性を強調すること など"></textarea>
+    </div>
+  </div>
+
+  <!-- Progress -->
+  <div id="progressArea" class="card" style="display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <span style="font-size:13px;display:flex;align-items:center;gap:8px"><span class="spin">⚙️</span> 処理中...</span>
+      <span id="progText" style="font-family:'DM Mono',monospace;font-size:12px;color:var(--accent)">0 / 0</span>
+    </div>
+    <div class="prog-wrap"><div class="prog-bar" id="progBar" style="width:0%"></div></div>
+    <div id="progDetail" class="txt-xs mt8"></div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-outline" onclick="goStep(2)">← 戻る</button>
+    <button class="btn btn-primary btn-lg" id="runBtn" onclick="runProcess()">▶ 処理を実行</button>
+  </div>
+</div>
+
+<!-- ===== STEP 4: プレビュー・ダウンロード ===== -->
+<div class="page" id="page4">
+  <div id="statsArea" class="stats" style="display:none">
+    <div class="stat"><div class="stat-val" id="stTotal">0</div><div class="stat-lbl">総件数</div></div>
+    <div class="stat"><div class="stat-val" style="color:var(--accent2)" id="stAddr">0</div><div class="stat-lbl">住所分割済み</div></div>
+    <div class="stat"><div class="stat-val" style="color:var(--accent3)" id="stAI">0</div><div class="stat-lbl">AIリライト済み</div></div>
+    <div class="stat"><div class="stat-val" style="color:var(--accent)" id="stErr">0</div><div class="stat-lbl">要確認</div></div>
+  </div>
+
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+    <div class="pg-title" style="margin-bottom:0">結果プレビュー</div>
+    <div style="display:flex;gap:10px;align-items:center">
+      <div class="view-toggle">
+        <button class="vt-btn on" id="vCard" onclick="setView('card')">カード</button>
+        <button class="vt-btn" id="vTable" onclick="setView('table')">テーブル</button>
+      </div>
+      <button class="btn btn-success" onclick="downloadResult()">⬇ Excelダウンロード</button>
+          <button class="btn btn-outline" onclick="copyResultTSV()" id="copyTsvBtn">📋 スプシに貼り戻す用コピー</button>
+    </div>
+  </div>
+
+  <div id="cardView"><div id="previewCards"></div></div>
+  <div id="tableView" style="display:none">
+    <div class="tbl-wrap">
+      <table><thead id="tHead"></thead><tbody id="tBody"></tbody></table>
+    </div>
+  </div>
+</div>
+
+</div><!-- /main -->
+
+<!-- ===== SIDEBAR ===== -->
+<div class="sidebar">
+  <div class="sb-section">
+    <div class="sb-label">読み込み状況</div>
+    <div id="sbFileInfo">
+      <div class="empty">ファイル未読み込み</div>
+    </div>
+  </div>
+  <div class="hr"></div>
+  <div class="sb-section">
+    <div class="sb-label" id="sbRuleLabel">住所ルール</div>
+    <div id="sbRules" style="font-size:11px;color:var(--text2);line-height:2">
+      <div class="rule-line"><span class="badge b-teal">前処理</span>全角→半角、ハイフン統一</div>
+      <div class="rule-line"><span class="badge b-teal">前処理</span>郵便番号除去、末尾ハイフン除去</div>
+      <div class="rule-line"><span class="badge b-teal">前処理</span>漢数字丁目→算用数字</div>
+      <div class="rule-line" id="sbRuleOut1"><span class="badge b-purple">出力1</span>都道府県市区町村（丁目まで）</div>
+      <div class="rule-line" id="sbRuleOut2"><span class="badge b-purple">出力2</span>番地</div>
+      <div class="rule-line" id="sbRuleOut3"><span class="badge b-purple">出力3</span>建物名</div>
+      <div class="rule-line" id="sbRuleExtra"></div>
+    </div>
+  </div>
+  <div class="hr"></div>
+  <div class="sb-section">
+    <div class="sb-label">仕事内容ルール</div>
+    <div style="font-size:11px;color:var(--text2);line-height:2">
+      <div class="rule-line"><span class="badge b-amber">出力</span>★職種名★ で始める</div>
+      <div class="rule-line"><span class="badge b-amber">出力</span>見出し＋本文形式で整理</div>
+      <div class="rule-line"><span class="badge b-amber">内容</span>未経験者でもイメージできる</div>
+      <div class="rule-line"><span class="badge b-amber">内容</span>働くメリットを自然に含める</div>
+      <div class="rule-line"><span class="badge b-amber">内容</span>専門用語を噛み砕く</div>
+    </div>
+  </div>
+  <div class="hr"></div>
+  <div id="sbDetail" class="sb-section" style="display:none">
+    <div class="sb-label">選択中のデータ</div>
+    <div id="sbDetailContent"></div>
+  </div>
+</div>
+</div><!-- /layout -->
+
+<div class="toast" id="toast"><span id="toastIcon"></span><span id="toastMsg"></span></div>
+
+<script>
+// ============================================================
+// STATE
+// ============================================================
+const S = {
+  addrWB: null, addrFile: null,
+  jobWB: null,  jobFile: null,
+  addrPasteRows: [],
+  jobPasteRows: [],
+  inputTab: 'paste',   // 'paste' | 'file'
+  fmt: '700',
+  mode: 'addr',
+  tone: 'standard',
+  addrResult: [],
+  jobResult: [],
+  viewMode: 'card'
+};
+
+// フォーマット定義
+const FMT = {
+  '700': {
+    label: '700形式',
+    headerRows: 2,
+    noCol: 0,
+    mainAddrCol: 2,   // C列：優先度1（雇入れ直後：の後）
+    subAddrCol: 3,    // D列：優先度2（Y列の住所）
+    prefHintCol: null,
+    cityHintCol: null,
+    existingZipCol: null,
+    outCityTown: 'E列（都道府県市区町村・丁目まで）',
+    outBanchi:   'F列（番地）',
+    outBuilding: 'G列（建物名）',
+    outZip:      'H列（郵便番号）',
+  },
+  'jobati': {
+    label: 'ジョバティ形式',
+    headerRows: 2,
+    noCol: 0,
+    mainAddrCol: 1,   // B列：住所
+    subAddrCol: null,
+    prefHintCol: null,
+    cityHintCol: null,
+    existingZipCol: null,
+    outCityTown: 'D列（都道府県市区町村・丁目まで）',
+    outBanchi:   'E列（番地）',
+    outBuilding: 'F列（建物名）',
+    outZip:      'G列（郵便番号）',
+  },
+  'circus': {
+    label: 'サーカス形式',
+    headerRows: 1,    // 1行ヘッダー（Book2は1行）
+    noCol: 0,         // A列：お仕事No.
+    prefHintCol: 2,   // C列：都道府県フル
+    cityHintCol: 3,   // D列：市区町村
+    mainAddrCol: 4,   // E列：都道府県市区町村テキスト（優先度2）
+    subAddrCol: 5,    // F列：本社住所（優先度3）
+    existingZipCol: null,
+    outCityTown: 'G列（都道府県市区町村・丁目まで）',
+    outBanchi:   'H列（番地）',
+    outBuilding: 'I列（建物名）',
+    outZip:      'J列（郵便番号）',
+  }
+};
+
+// ============================================================
+// FILE LOADING
+// ============================================================
+function triggerFile(id){ document.getElementById(id).click() }
+
+function loadFile(ev, type){
+  const file = ev.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const wb = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+    if(type==='addr'){ S.addrWB=wb; S.addrFile=file.name; markSlot('addr',file.name,wb.SheetNames); }
+    else             { S.jobWB=wb;  S.jobFile=file.name;  markSlot('job', file.name,wb.SheetNames); }
+    updateStep1();
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function dropFile(ev, type){
+  ev.preventDefault();
+  ev.currentTarget.classList.remove('drag');
+  const file = ev.dataTransfer.files[0];
+  if(!file || !file.name.endsWith('.xlsx')){ toast('⚠️','xlsxファイルのみ対応しています'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    const wb = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+    if(type==='addr'){ S.addrWB=wb; S.addrFile=file.name; markSlot('addr',file.name,wb.SheetNames); }
+    else             { S.jobWB=wb;  S.jobFile=file.name;  markSlot('job', file.name,wb.SheetNames); }
+    updateStep1();
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function markSlot(type, fname, sheets){
+  const slot = document.getElementById(type==='addr'?'addrSlot':'jobSlot');
+  slot.classList.add('loaded');
+  document.getElementById(type==='addr'?'addrFileName':'jobFileName').textContent = fname;
+  const sel = document.getElementById(type==='addr'?'addrSheet':'jobSheet');
+  if(sel){
+    sel.innerHTML = sheets.map(s=>`<option>${s}</option>`).join('');
+    if(type==='addr') sel.value = sheets.find(s=>s==='Sheet1')||sheets[0];
+    else sel.value = sheets.find(s=>/求人|原稿/i.test(s))||sheets[0];
+  }
+  updateSidebar();
+}
+
+function updateStep1(){
+  document.getElementById('step1Next').disabled = !(S.addrWB || S.jobWB || S.addrPasteRows.length || S.jobPasteRows.length);
+}
+
+// ============================================================
+// INPUT TAB SWITCHING
+// ============================================================
+function switchInputTab(tab){
+  S.inputTab = tab;
+  document.getElementById('inputTabPaste').classList.toggle('on', tab==='paste');
+  document.getElementById('inputTabFile').classList.toggle('on', tab==='file');
+  document.getElementById('pasteInputArea').style.display = tab==='paste' ? 'block' : 'none';
+  document.getElementById('fileInputArea').style.display  = tab==='file'  ? 'block' : 'none';
+}
+
+// ============================================================
+// PASTE INPUT — TSV（スプシコピペ）→ 2D配列に変換
+// ============================================================
+function parseTSV(text){
+  if(!text.trim()) return [];
+  return text.trim().split('\n').map(line =>
+    line.split('\t').map(cell => cell.replace(/\r$/,''))
+  );
+}
+
+function onPasteInput(type){
+  if(type === 'addr'){
+    const text = document.getElementById('addrPasteArea').value;
+    const rows = parseTSV(text);
+    S.addrPasteRows = rows;
+    const dataRows = rows.filter(r => r.some(c => c.trim()));
+    const preview = document.getElementById('addrPastePreview');
+    if(dataRows.length > 0){
+      preview.textContent = `✅ ${dataRows.length}行を検出（列数: ${Math.max(...dataRows.map(r=>r.length))}列）`;
+    } else {
+      preview.textContent = '';
+    }
+  } else {
+    const text = document.getElementById('jobPasteArea').value;
+    const rows = parseTSV(text);
+    S.jobPasteRows = rows;
+    const dataRows = rows.filter(r => r.some(c => c.trim()));
+    const preview = document.getElementById('jobPastePreview');
+    if(dataRows.length > 0){
+      preview.textContent = `✅ ${dataRows.length}行を検出`;
+    } else {
+      preview.textContent = '';
+    }
+  }
+  updateStep1();
+}
+
+// コピペデータをWBオブジェクトに変換（既存処理との互換）
+function pasteRowsToWB(rows, sheetName){
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  return {SheetNames:[sheetName], Sheets:{[sheetName]: ws}};
+}
+
+// サンプルをテキストエリアに流し込む
+function fillPasteArea(type, rows){
+  const tsv = rows.map(r => r.map(c => c===null||c===undefined?'':String(c)).join('\t')).join('\n');
+  if(type==='addr'){
+    document.getElementById('addrPasteArea').value = tsv;
+    onPasteInput('addr');
+  } else {
+    document.getElementById('jobPasteArea').value = tsv;
+    onPasteInput('job');
+  }
+}
+
+// ============================================================
+// FORMAT SELECTION
+// ============================================================
+function selectFmt(f){
+  S.fmt = f;
+  ['700','jobati','circus'].forEach(id=>{
+    document.getElementById('fmt'+id.charAt(0).toUpperCase()+id.slice(1)).classList.toggle('on', id===f);
+  });
+  updateSidebarRules();
+}
+// capitalize first letter helper
+String.prototype.cap = function(){ return this.charAt(0).toUpperCase()+this.slice(1); };
+
+// ============================================================
+// SAMPLE DATA
+// ============================================================
+function loadSampleAddr(){
+  const f = S.fmt;
+  let data, fname;
+  if(f==='700'){
+    fname = 'サンプル_700形式.xlsx';
+    data = [
+      [null,'参考用',null,null,'都道府県市区町村　※丁目まで','番地','建物名','郵便番号'],
+      ['お仕事No.','雇入れ直後：の後','住所',null,'住所',null,null,null],
+      [193604, null, '佐賀県東松浦郡玄海町今村浅湖4112-1'],
+      [193588, '大阪府大阪市西区', '大阪府大阪市西区立売堀３丁目６－２'],
+      [193537, '大分県大分市上判田', '大分県大分市上判田3433'],
+      [193510, '兵庫県尼崎市西立花町5丁目12番1号', '兵庫県尼崎市西立花町5丁目12番1号'],
+      [172967, '埼玉県東松山市', '埼玉県東松山市内の小中学校 ※複数校'],
+      [114040, null, '〒108-0073 東京都港区三田一丁目1番14号 Bizflex麻布十番2F'],
+    ];
+  } else if(f==='jobati'){
+    fname = 'サンプル_ジョバティ形式.xlsx';
+    data = [
+      [null,null,null,'都道府県市区町村　※丁目まで','番地','建物名','郵便番号'],
+      ['お仕事No.','住所',null,'住所',null,null,null],
+      [104626, '東京都東京都エリアでのお仕事です。'],
+      [121781, '長野県松本市-'],
+      [104669, '大阪府茨木市-'],
+      [121768, '静岡県掛川市春日4890-1 マルナガロジスティクス(株)内'],
+      [121776, '愛知県大府市共栄町1番1号TBM神戸ビル5F'],
+      [104700, '〒150-0001 東京都渋谷区神宮前1-14-34'],
+    ];
+  } else {
+    fname = 'サンプル_サーカス形式.xlsx';
+    data = [
+      [null,'優先度1',null,null,'優先度2','優先度3','都道府県市区町村　※丁目まで','番地','建物名','郵便番号'],
+      ['お仕事No.','勤務都道府県',null,'勤務市区町村','都道府県市区町村','本社住所','都道府県市区町村','番地','建物名',null],
+      [122741,'愛知','愛知県','豊田市','ダイコーテクノ分室\n愛知県豊田市元町3-1 センタービル5F','広島県広島市中区東平塚町1-14 大興平塚ビル5F'],
+      [123280,'愛知','愛知県','田原市','勤務地／トヨタ自動車 田原工場 〒441-3401 愛知県田原市緑が浜3-1\n本プロジェクト終了後：愛知県豊田市元町','広島県広島市中区東平塚町1-14 大興平塚ビル5F'],
+      [175349,'東京','東京都','目黒区','〒153-0042\n東京都目黒区青葉台4-7-7 住友不動産青葉台ヒルズ8F\n◾️最寄駅：神泉駅 徒歩6分','渋谷区桜丘町23-17 シティコート桜丘408号室'],
+      [319492,'東京','東京都','千代田区','【本社】住所：東京都千代田区岩本町3-9-9 第一瀬野ビル2F','千代田区岩本町3丁目9-9第一瀬野ビル 2F'],
+    ];
+  }
+  if(S.inputTab === 'paste'){
+    fillPasteArea('addr', data);
+    toast('📍', `${FMT[f].label}のサンプルを貼り付けました`);
+  } else {
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    const wb = {SheetNames:['Sheet1','ルール'], Sheets:{Sheet1:ws, ルール:XLSX.utils.aoa_to_sheet([['ルール']])}};
+    S.addrWB = wb; S.addrFile = fname;
+    markSlot('addr', fname, wb.SheetNames);
+    updateStep1();
+    toast('📍', `${FMT[f].label}のサンプルを読み込みました`);
+  }
+}
+
+function loadSampleJob(){
+  const data = [
+    ['仕事内容１（元データ）','仕事内容（魅力的な原稿）'],
+    ['仕事内容１','仕事内容（魅力的な原稿）'],
+    ['ビルや住宅の清掃業務。モップ・掃除機を使った床清掃、トイレ・洗面台の清潔保持、ゴミ回収など。週3日〜、1日4h〜OK。交通費支給。社会保険完備。未経験歓迎。',''],
+    ['工場内での検査・梱包作業。製品の目視確認、不良品の取り除き、箱詰め・テープ貼り作業。ライン作業のため覚えやすい。土日祝休み。残業ほぼなし。',''],
+    ['老人ホームでの介護補助。食事の配膳・片付け、入居者との会話や散歩付き添い、レクリエーションのサポートなど。資格不要。研修制度あり。',''],
+    ['コンビニエンスストアのスタッフ。レジ・品出し・清掃。早朝・深夜シフトあり。Wワーク・学生歓迎。制服貸与。昇給制度あり。',''],
+    ['軽自動車での宅配ドライバー。担当エリアの荷物を1日60〜80個程度配達。ルート固定なので覚えやすい。歩合あり。普通免許（AT可）のみで応募可。',''],
+  ];
+  if(S.inputTab === 'paste'){
+    fillPasteArea('job', data);
+    toast('💼', '仕事内容サンプルを貼り付けました');
+  } else {
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    const wb = {SheetNames:['求人原稿','ルール'], Sheets:{求人原稿:ws, ルール:XLSX.utils.aoa_to_sheet([['ルール']])}};
+    S.jobWB = wb; S.jobFile = 'サンプル_仕事内容.xlsx';
+    markSlot('job','サンプル_仕事内容.xlsx',wb.SheetNames);
+    updateStep1();
+    toast('💼','仕事内容サンプルデータを読み込みました（5件）');
+  }
+}
+
+// ============================================================
+// MODE / FORMAT SELECTION
+// ============================================================
+function selectMode(m){
+  S.mode = m;
+  ['addr','job','both'].forEach(id=>{
+    document.getElementById('mode'+id.charAt(0).toUpperCase()+id.slice(1)).classList.toggle('on', id===m);
+  });
+  document.getElementById('modeWarning').style.display = (m==='job'||m==='both')?'block':'none';
+}
+
+// ============================================================
+// STEP 3 SETTINGS
+// ============================================================
+function togglePill(el, hiddenId, val){
+  el.classList.toggle('on');
+  const inp = document.getElementById(hiddenId);
+  let vals = inp.value ? inp.value.split(',') : [];
+  if(el.classList.contains('on')) vals.push(val);
+  else vals = vals.filter(v=>v!==val);
+  inp.value = [...new Set(vals)].join(',');
+}
+
+function setTone(t){
+  S.tone = t;
+  ['standard','friendly','pro'].forEach(id=>{
+    document.getElementById('tone_'+id).classList.toggle('on', id===t);
+  });
+}
+
+// ============================================================
+// MAIN PROCESSING
+// ============================================================
+async function runProcess(){
+  const mode = S.mode;
+
+  // コピペモードの場合、テキストエリアのデータをWBに変換
+  if(S.inputTab === 'paste'){
+    if((mode==='addr'||mode==='both') && S.addrPasteRows.length){
+      S.addrWB = pasteRowsToWB(S.addrPasteRows, 'Sheet1');
+      S.addrFile = 'コピペデータ（住所）';
+    }
+    if((mode==='job'||mode==='both') && S.jobPasteRows.length){
+      S.jobWB = pasteRowsToWB(S.jobPasteRows, '求人原稿');
+      S.jobFile = 'コピペデータ（仕事内容）';
+    }
+  }
+  document.getElementById('progressArea').style.display = 'block';
+  document.getElementById('runBtn').disabled = true;
+  S.addrResult = [];
+  S.jobResult = [];
+
+  if(mode==='addr'||mode==='both'){
+    if(!S.addrWB){ toast('⚠️','住所ファイルを読み込んでください'); return; }
+    await processAddr();
+  }
+  if(mode==='job'||mode==='both'){
+    if(!S.jobWB){ toast('⚠️','仕事内容ファイルを読み込んでください'); return; }
+    const apiKey = document.getElementById('apiKey').value.trim();
+    if(!apiKey){ toast('⚠️','APIキーを入力してください'); document.getElementById('runBtn').disabled=false; return; }
+    await processJob(apiKey);
+  }
+
+  document.getElementById('progressArea').style.display = 'none';
+  document.getElementById('runBtn').disabled = false;
+  renderStep4();
+  goStep(4);
+  toast('✅', '処理が完了しました！');
+}
+
+// ---- ADDRESS PROCESSING（3フォーマット対応）----
+async function processAddr(){
+  const fmt = FMT[S.fmt];
+  const sheetName = document.getElementById('addrSheet').value;
+  const ws = S.addrWB.Sheets[sheetName];
+  const raw = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+  const dataRows = raw.slice(fmt.headerRows);
+
+  setProg(0, dataRows.length, `[${fmt.label}] 住所データを準備中...`);
+
+  for(let i=0; i<dataRows.length; i++){
+    const row = dataRows[i];
+    if(!row || row.every(c=>c===''||c===null||c===undefined)) continue;
+    setProg(i+1, dataRows.length, `[${fmt.label}] 住所分割中: 行${i+1}`);
+
+    const no = String(row[fmt.noCol]||'').trim();
+    let cityTown='', banchi='', building='', zip='', warn='';
+
+    // ===== 700形式：C列（優先度1）→ D列（優先度2） =====
+    // ===== ジョバティ形式：B列のみ =====
+    if(S.fmt === '700' || S.fmt === 'jobati'){
+      let mainAddr = preprocess(String(row[fmt.mainAddrCol]||'').trim());
+      const subAddr = fmt.subAddrCol!=null ? preprocess(String(row[fmt.subAddrCol]||'').trim()) : '';
+
+      // ジョバティ特有のゴミパターン除去
+      if(S.fmt === 'jobati'){
+        if(/エリア|のお仕事|◆|【勤務地】/i.test(mainAddr)){
+          const m = mainAddr.match(/^(東京都|北海道|大阪府|京都府|.{2,3}県)(.{2,10}?[市区町村])/);
+          cityTown = m ? m[1]+m[2] : '';
+          warn = '要確認（番地なし・エリア表記）';
+          S.addrResult.push({_no:no, 都道府県市区町村:cityTown, 番地:'', 建物名:'', 郵便番号:'', _warn:warn});
+          await sleep(2); continue;
+        }
+        if(/複数|※|内の/.test(mainAddr)){
+          const parsed = parseAddressDetail(mainAddr,'','');
+          S.addrResult.push({_no:no, 都道府県市区町村:parsed.cityTown, 番地:parsed.banchi, 建物名:parsed.building, 郵便番号:'', _warn:'要確認（複数拠点）'});
+          await sleep(2); continue;
+        }
+      }
+
+      // 700形式：C列（優先度1）を使い、空または取得失敗ならD列（優先度2）にフォールバック
+      let src = mainAddr;
+      let parsed = src ? parseAddressDetail(src,'','') : null;
+
+      // C列で都道府県が取れなかった場合 → D列を試みる
+      if(S.fmt === '700' && (!parsed || !parsed.cityTown) && subAddr){
+        src = subAddr;
+        parsed = parseAddressDetail(src,'','');
+      }
+
+      if(parsed && parsed.cityTown){
+        cityTown = parsed.cityTown; banchi = parsed.banchi; building = parsed.building;
+      } else if(src){
+        // 都道府県は取れないが住所らしきものあり
+        cityTown = ''; banchi = src; building = '';
+        warn = '要確認（都道府県抽出失敗）';
+      } else {
+        warn = '要確認（住所データなし）';
+      }
+
+    // ===== サーカス形式：優先度1→2→3（要件定義通り） =====
+    } else if(S.fmt === 'circus'){
+      const cCol = String(row[fmt.prefHintCol]||'').trim(); // C列：都道府県フル（例：東京都）
+      const dCol = String(row[fmt.cityHintCol]||'').trim(); // D列：市区町村（例：新宿区）
+      const eRaw = String(row[fmt.mainAddrCol]||'').trim(); // E列：都道府県市区町村テキスト（複数行）
+      const fRaw = String(row[fmt.subAddrCol] ||'').trim(); // F列：本社住所
+
+      const isInvalidCity = /プロジェクトに準ずる|勤務地に準ずる|未定|応相談|各拠点|事業所に準ずる/.test(dCol);
+
+      let resolved = null; // { cityTown, banchi, building, zip, source }
+
+      // ===== 優先度1：D列が具体的市区町村 → E列の同じ市区町村行を照合 =====
+      if(cCol && dCol && !isInvalidCity){
+        // E列の各行を走査して、D列と同じ市区町村を含む行を探す
+        const matchedLine = findMatchingCityLine(eRaw, cCol, dCol);
+        if(matchedLine){
+          const parsed = parseAddressDetail(preprocess(matchedLine), cCol, dCol);
+          // D列の市区町村をベースに都道府県補完
+          const ct = parsed.cityTown || (cCol + dCol);
+          resolved = { cityTown: ct, banchi: parsed.banchi, building: parsed.building, source:'E列（市区町村一致）' };
+        } else {
+          // E列に一致行なし → D列のみで市区町村確定（番地なし）、F列から番地を試みる
+          const fParsed = fRaw ? parseAddressDetail(preprocess(extractAddrLineFromText(fRaw, cCol, dCol)), cCol, dCol) : null;
+          if(fParsed && fParsed.banchi && isSameCity(fParsed.cityTown, cCol+dCol)){
+            resolved = { cityTown: fParsed.cityTown||cCol+dCol, banchi: fParsed.banchi, building: fParsed.building, source:'F列（D列市区町村一致）' };
+          } else {
+            resolved = { cityTown: cCol+dCol, banchi:'', building:'', source:'D列のみ', warn:'要確認（番地なし）' };
+          }
+        }
+      }
+
+      // ===== 優先度2：D列が「プロジェクトに準ずる」等 → E列から都道府県に合う住所を選択 =====
+      if(!resolved && eRaw){
+        const line = extractAddrLineFromText(eRaw, cCol, '');
+        if(line){
+          const parsed = parseAddressDetail(preprocess(line), cCol, '');
+          if(parsed.cityTown){
+            resolved = { cityTown: parsed.cityTown, banchi: parsed.banchi, building: parsed.building, source:'E列（都道府県一致）' };
+          }
+        }
+      }
+
+      // ===== 優先度3：F列（本社住所） =====
+      if(!resolved && fRaw){
+        const fClean = preprocess(extractAddrLineFromText(fRaw, cCol, dCol) || fRaw.split('\n')[0]);
+        const parsed = parseAddressDetail(fClean, cCol, dCol);
+        // F列に都道府県がない場合はC列で補完
+        const ct = parsed.cityTown || (cCol ? cCol+(parsed.cityOnly||dCol||'') : '');
+        resolved = { cityTown: ct, banchi: parsed.banchi, building: parsed.building, source:'F列（本社住所）' };
+      }
+
+      if(resolved){
+        cityTown = resolved.cityTown||'';
+        banchi   = resolved.banchi||'';
+        building = resolved.building||'';
+        warn     = resolved.warn||'';
+        if(!cityTown) warn = '要確認（住所取得失敗）';
+      } else {
+        cityTown = cCol ? cCol+(dCol&&!isInvalidCity?dCol:'') : '';
+        warn = '要確認（住所データなし）';
+      }
+    }
+
+    S.addrResult.push({_no:no, 都道府県市区町村:cityTown, 番地:banchi, 建物名:building, 郵便番号:zip, _warn:warn});
+    await sleep(2);
+  }
+}
+
+// ---- JOB CONTENT PROCESSING ----
+async function processJob(apiKey){
+  const sheetName = document.getElementById('jobSheet').value;
+  const maxRows = parseInt(document.getElementById('maxRows').value);
+  const extra = document.getElementById('extraInst').value.trim();
+  const ws = S.jobWB.Sheets[sheetName];
+  const raw = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+  const dataRows = raw.slice(2).slice(0, maxRows); // skip 2 header rows
+
+  setProg(0, dataRows.length, '仕事内容を準備中...');
+  for(let i=0; i<dataRows.length; i++){
+    const row = dataRows[i];
+    const original = String(row[0]||'').trim();
+    if(!original){ S.jobResult.push({original:'', rewritten:'', _warn:'空行'}); continue; }
+
+    setProg(i+1, dataRows.length, `AIリライト中: ${i+1}/${dataRows.length}件目`);
+    try {
+      const rewritten = await rewriteJob(original, S.tone, extra, apiKey);
+      S.jobResult.push({original, rewritten, _warn:''});
+    } catch(e){
+      S.jobResult.push({original, rewritten:'', _warn:'APIエラー: '+e.message});
+    }
+    await sleep(300);
+  }
+}
+
+// ============================================================
+// ADDRESS PARSING — 要件定義準拠版
+// ============================================================
+
+// 2つの市区町村文字列が同じかどうか判定（表記ゆれ対応）
+function isSameCity(a, b){
+  if(!a || !b) return false;
+  // 都道府県・市区町村の末尾文字を除いたコアで比較
+  const normalize = s => s.replace(/[都道府県市区町村郡]/g,'').replace(/\s/g,'');
+  const na = normalize(a), nb = normalize(b);
+  return na.includes(nb) || nb.includes(na) || na.slice(0,4)===nb.slice(0,4);
+}
+
+// E列テキストの各行を走査し、D列の市区町村と一致する住所行を返す
+// 「大阪市城東区」が含まれる行 → その行全体を返す
+function findMatchingCityLine(text, hintPref, hintCity){
+  if(!text || !hintCity) return '';
+  const lines = text.split(/[\n\r]+/).map(l=>l.trim()).filter(Boolean);
+  const junk = /徒歩|分|バス|路線|駅|アクセス|変更の範囲|テレワーク|リモート|■最寄|■アクセス/;
+  const banchiPat = /\d[-－]\d|\d+番地|\d+番\d*号?|\d+丁目/;
+
+  // hintCityを正規化（「大阪市城東区」→「城東区」「大阪市」など複数候補）
+  const cityVariants = buildCityVariants(hintCity);
+
+  for(const ln of lines){
+    if(junk.test(ln)) continue;
+    // ゴミ除去（郵便番号等）してマッチング
+    const cleaned = ln.replace(/〒\s*\d{3}-\d{4}/g,'').replace(/〒\s*\d{7}/g,'').trim();
+    // 市区町村のいずれかの表現が含まれ、かつ番地系がある行を採用
+    if(cityVariants.some(v => cleaned.includes(v)) && banchiPat.test(cleaned)){
+      return cleaned;
+    }
+  }
+  // 番地なしでも市区町村一致行があれば返す
+  for(const ln of lines){
+    if(junk.test(ln)) continue;
+    const cleaned = ln.replace(/〒\s*\d{3}-\d{4}/g,'').replace(/〒\s*\d{7}/g,'').trim();
+    if(cityVariants.some(v => cleaned.includes(v))){
+      return cleaned;
+    }
+  }
+  return '';
+}
+
+// 市区町村の表記バリエーションを生成
+// 例：「大阪市城東区」→ ['大阪市城東区', '城東区', '大阪市'] など
+function buildCityVariants(city){
+  const variants = [city];
+  // 「○○市△△区」→「△△区」も追加
+  const kuMatch = city.match(/([^市]+市)([^区]+区)/);
+  if(kuMatch){ variants.push(kuMatch[1]); variants.push(kuMatch[2]); }
+  // 「△△区」単体
+  const kuOnly = city.match(/[^市区]+区$/);
+  if(kuOnly) variants.push(kuOnly[0]);
+  // 末尾2〜4文字
+  if(city.length >= 3) variants.push(city.slice(-3));
+  if(city.length >= 4) variants.push(city.slice(-4));
+  return [...new Set(variants)].filter(v=>v.length>=2);
+}
+
+// テキストから都道府県/市区町村ヒントに合う住所行を1行抽出（「プロジェクト」系用）
+function extractAddrLineFromText(text, hintPref, hintCity){
+  if(!text) return '';
+  const lines = text.split(/[\n\r]+/).map(l=>l.trim()).filter(Boolean);
+  const junk = /徒歩|分|バス|路線|駅|アクセス|変更の範囲|テレワーク|リモート|その他|東京23区|神奈川|千葉|埼玉$|プロジェクトにより|上記もしくは|■最寄|◆/;
+  const banchiPat = /\d[-－]\d|\d+番地|\d+番\d*号?|\d+丁目/;
+  const prefPat = /東京都|北海道|大阪府|京都府|.{2,3}県/;
+
+  // 都道府県+番地がある行を優先
+  for(const ln of lines){
+    if(junk.test(ln)) continue;
+    const cleaned = ln.replace(/〒\s*\d{3}-\d{4}/g,'').replace(/〒\s*\d{7}/g,'').replace(/【[^】]*】/g,'').trim();
+    if(!cleaned) continue;
+    const hasPref = prefPat.test(cleaned) || (hintPref && cleaned.startsWith(hintPref.replace(/[都道府県]/,'')));
+    const hasBanchi = banchiPat.test(cleaned);
+    const hasCity = /[市区町村]/.test(cleaned);
+    if(hasPref && hasBanchi && hasCity) return cleaned;
+  }
+  // 番地だけある行
+  for(const ln of lines){
+    if(junk.test(ln)) continue;
+    const cleaned = ln.replace(/〒\s*\d{3}-\d{4}/g,'').replace(/〒\s*\d{7}/g,'').replace(/【[^】]*】/g,'').trim();
+    if(cleaned && banchiPat.test(cleaned) && /[市区町村]/.test(cleaned)) return cleaned;
+  }
+  return '';
+}
+
+// ■ 前処理：全角→半角、ハイフン統一、漢数字丁目変換、郵便番号除去
+function preprocess(s){
+  if(!s) return '';
+  return s
+    // 全角英数字→半角
+    .replace(/[Ａ-Ｚａ-ｚ０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+    // 全角ハイフン系→半角
+    .replace(/[－―‐ー−]/g, '-')
+    // 漢数字丁目→算用数字（一〜十まで対応）
+    .replace(/十([一二三四五六七八九])丁目/g, (_,c) => (10+'一二三四五六七八九'.indexOf(c)+1)+'丁目')
+    .replace(/十丁目/g, '10丁目')
+    .replace(/[一二三四五六七八九]丁目/g, m => ('一二三四五六七八九'.indexOf(m[0])+1)+'丁目')
+    // 末尾のハイフン除去
+    .replace(/-+$/, '')
+    // 郵便番号除去（〒xxx-xxxx または 〒xxxxxxx）
+    .replace(/〒\s*\d{3}-\d{4}\s*/g, '')
+    .replace(/〒\s*\d{7}\s*/g, '')
+    .trim();
+}
+
+// E列・F列のテキストから「都道府県＋市区町村＋番地が含まれる行」を抽出
+// ゴミ（◆住所、【勤務地】、路線情報など）を除去
+function extractCleanAddress(text, hintPref, hintCity){
+  if(!text) return '';
+  const lines = text.split(/[\n\r]+/).map(l => l.trim()).filter(Boolean);
+
+  // 都道府県パターン
+  const prefPat = /東京都|北海道|大阪府|京都府|.{2,3}県/;
+  // 市区町村パターン
+  const cityPat = /[市区町村郡]/;
+  // 番地系パターン（数字＋ハイフン or 番地 or 番 or 号）
+  const banchPat = /\d[-－]\d|\d+番地|\d+番\d*号?|\d+丁目/;
+  // ゴミ行パターン（路線・交通情報・注釈など）
+  const junkPat = /徒歩|分|バス|路線|駅|電車|アクセス|【|◆|※|入社後|変更の範囲|研修|テレワーク|^\s*$/;
+
+  for(const ln of lines){
+    if(junkPat.test(ln)) continue;
+    const cleaned = preprocess(ln);
+    // 都道府県 or ヒント都道府県 が含まれ、かつ番地系がある行を採用
+    if((prefPat.test(cleaned) || (hintPref && cleaned.includes(hintPref.replace(/[都道府県]/g,'')))) &&
+       (banchPat.test(cleaned) || cityPat.test(cleaned))){
+      return cleaned;
+    }
+    // 市区町村ヒントが含まれ番地がある行
+    if(hintCity && cleaned.includes(hintCity.replace(/[市区町村]/g,'')) && banchPat.test(cleaned)){
+      return cleaned;
+    }
+  }
+  // どれも引っかからなければ最初の非ゴミ行を返す
+  for(const ln of lines){
+    if(!junkPat.test(ln) && ln.length > 4) return preprocess(ln);
+  }
+  return '';
+}
+
+// 住所文字列を「都道府県市区町村（丁目まで）」「番地」「建物名」に分割
+function parseAddressDetail(addr, hintPref, hintCity){
+  if(!addr) return {cityTown:'', cityOnly:'', banchi:'', building:''};
+  addr = preprocess(addr);
+
+  // --- 都道府県を抽出 ---
+  const prefM = addr.match(/^(東京都|北海道|大阪府|京都府|.{2,3}県)/);
+  let pref = prefM ? prefM[1] : (hintPref||'');
+  let rest = prefM ? addr.slice(pref.length) : (hintPref ? addr.replace(new RegExp('^'+hintPref.replace(/[都道府県]/,'')), '') : addr);
+
+  // --- 市区町村＋丁目まで抽出 ---
+  // 丁目がある場合：〇〇市〇〇区〇〇町3丁目 まで
+  // 丁目がない場合：〇〇市〇〇区 まで（できるだけ長く）
+  let cityTown = '', restAfterCity = rest;
+
+  // パターン1: 丁目まで明示されている
+  const chomeM = rest.match(/^(.+?[市区町村郡].+?\d+丁目)/);
+  if(chomeM){
+    cityTown = pref + chomeM[1];
+    restAfterCity = rest.slice(chomeM[1].length).trim();
+  } else {
+    // パターン2: 市区町村まで（最も長い一致）
+    const cityM = rest.match(/^(.+?(?:市|区|町|村|郡)(?:[^\d\-\s番地号棟階F（(「【]*)?)/);
+    if(cityM){
+      cityTown = pref + cityM[1];
+      restAfterCity = rest.slice(cityM[1].length).trim();
+    } else {
+      cityTown = pref + (hintCity||'');
+      restAfterCity = rest;
+    }
+  }
+
+  // --- 番地とE列のルール適用 ---
+  // restAfterCity の先頭が番地部分
+  let banchi = '', building = '';
+
+  // ハイフン2つ（例: 2-14-1）→ 先頭をD列末尾に「〇丁目」として移動、E列は残り
+  const h2M = restAfterCity.match(/^(\d+)-(\d+-\d+)(.*)/);
+  if(h2M && !cityTown.match(/\d+丁目$/) && !restAfterCity.match(/^\d+番/)){
+    cityTown = cityTown + h2M[1] + '丁目';
+    banchi   = h2M[2];
+    building = h2M[3].trim();
+  }
+  // すでに「丁目」あり → 丁目はD列確定済み、残りをE列に
+  else if(restAfterCity.match(/^\d+丁目/)){
+    const chM2 = restAfterCity.match(/^(\d+丁目)(.*)/);
+    if(chM2){
+      // 丁目がcityTownに含まれていなければ追加
+      if(!cityTown.match(/\d+丁目$/)) cityTown += chM2[1];
+      const afterChome = chM2[2].trim();
+      const splitRes = splitBanchiBuilding(afterChome);
+      banchi   = splitRes.banchi;
+      building = splitRes.building;
+    }
+  }
+  // 「N番地」「N番N号」形式 → そのままE列に
+  else if(restAfterCity.match(/^\d+番(地|\d+号?)?/)){
+    const splitRes = splitBanchiBuilding(restAfterCity);
+    banchi   = splitRes.banchi;
+    building = splitRes.building;
+  }
+  // ハイフン1つ（例: 4890-1）→ そのままE列に
+  else if(restAfterCity.match(/^\d+-\d+/)){
+    const splitRes = splitBanchiBuilding(restAfterCity);
+    banchi   = splitRes.banchi;
+    building = splitRes.building;
+  }
+  else {
+    const splitRes = splitBanchiBuilding(restAfterCity);
+    banchi   = splitRes.banchi;
+    building = splitRes.building;
+  }
+
+  return {
+    cityTown: cityTown.trim(),
+    cityOnly: (hintCity||''),
+    banchi:   banchi.trim(),
+    building: building.trim()
+  };
+}
+
+// 「番地 建物名」を分割
+// ルール：スペース区切りの番地後、または番地・号の後にスペースなしで続くもの、括弧内
+function splitBanchiBuilding(s){
+  if(!s) return {banchi:'', building:''};
+  s = s.trim();
+
+  // 括弧内の建物名パターン（例：（住友理工株式会社 小牧製作所構内））
+  const kakoM = s.match(/^(.*?)[\s　]*[（(](.+)[)）]\s*$/);
+  if(kakoM && kakoM[1].match(/\d/)){
+    return {banchi: kakoM[1].trim(), building: kakoM[2].trim()};
+  }
+
+  // 「N番N号BUILDING」番地・号の後にスペースなしで建物名
+  const noSpaceM = s.match(/^(\d+番\d*号?)([^\d\-].+)$/);
+  if(noSpaceM) return {banchi: noSpaceM[1].trim(), building: noSpaceM[2].trim()};
+
+  // スペース区切り（例：2032-1 マルナガロジスティクス(株)内）
+  const spaceM = s.match(/^(\S+)\s+(.+)$/);
+  if(spaceM && spaceM[1].match(/^\d/)){
+    return {banchi: spaceM[1].trim(), building: spaceM[2].trim()};
+  }
+
+  return {banchi: s, building: ''};
+}
+
+// ============================================================
+// AI REWRITE
+// ============================================================
+const TONE_PROMPTS = {
+  standard: '',
+  friendly: '文体は明るくフレンドリーに。「！」や「◎」などの記号を適度に使い、読みやすくしてください。',
+  pro: '文体はプロフェッショナルで信頼感を与えるものにしてください。スキルアップや実績を強調してください。'
+};
+
+async function rewriteJob(original, tone, extra, apiKey){
+  const toneStr = TONE_PROMPTS[tone]||'';
+  const extraStr = extra ? `\n追加指示: ${extra}` : '';
+
+  const prompt = `以下の指示に従い、仕事内容を求人原稿として魅力的にブラッシュアップしてください。
+
+【目的】求職者が「応募したくなる」ように、わかりやすく・魅力的に仕事内容を最適化すること
+
+【必須ルール】
+・最上部に職種名を記載すること
+・職種名は「★」で囲むこと（例：★検査・梱包スタッフ★）
+・本文は読みやすく整形すること（改行・箇条書きOK）
+・専門用語はできるだけ噛み砕くこと
+・未経験者でもイメージできる内容にすること
+
+【改善ポイント】
+・仕事内容は「具体的に」記載する
+・単なる作業説明ではなく「働くメリット」も自然に含める
+・ポジティブな表現に言い換える
+
+【出力形式】
+①職種名（★で囲む）
+②仕事内容（見出し＋本文形式で整理）
+
+${toneStr}${extraStr}
+
+---元データ---
+${original}
+---ここまで---
+
+求人原稿のみ出力してください。説明・前置き・コメントは不要です。`;
+
+  const res = await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01'},
+    body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:800,messages:[{role:'user',content:prompt}]})
+  });
+  const data = await res.json();
+  if(data.error) throw new Error(data.error.message);
+  return data.content[0].text.trim();
+}
+
+// ============================================================
+// RENDER STEP 4
+// ============================================================
+function renderStep4(){
+  const mode = S.mode;
+  let total=0, addrDone=0, aiDone=0, errCount=0;
+
+  const cardsEl = document.getElementById('previewCards');
+  cardsEl.innerHTML = '';
+
+  if(mode==='addr'||mode==='both'){
+    total += S.addrResult.length;
+    S.addrResult.forEach((r,i)=>{
+      if(r.都道府県市区町村) addrDone++;
+      if(r._warn) errCount++;
+      // D列から都道府県だけ表示用に抽出
+      const prefDisp = r.都道府県市区町村.match(/^(東京都|北海道|大阪府|京都府|.{2,3}県)/);
+      const p = prefDisp ? prefDisp[1] : '';
+      const ct = prefDisp ? r.都道府県市区町村.slice(p.length) : r.都道府県市区町村;
+      cardsEl.innerHTML += `
+        <div class="job-card" onclick="selectCard(this,${i},'addr')">
+          <div class="jc-no">No.${r._no||i+1} ${r._warn?`<span class="badge b-red">⚠ ${r._warn}</span>`:''}</div>
+          <div class="jc-addr">
+            ${p?`<span class="addr-chip" style="color:var(--accent2)">${p}</span>`:''}
+            ${ct?`<span class="addr-chip" style="color:var(--accent)">${ct}</span>`:''}
+            ${r.番地?`<span class="addr-chip">${r.番地}</span>`:'<span class="addr-chip" style="color:var(--text3)">番地なし</span>'}
+            ${r.建物名?`<span class="addr-chip" style="color:var(--text2)">${r.建物名}</span>`:''}
+            ${r.郵便番号?`<span class="addr-chip" style="color:var(--text3)">〒${r.郵便番号}</span>`:''}
+          </div>
+        </div>`;
+    });
+  }
+  if(mode==='job'||mode==='both'){
+    total += S.jobResult.length;
+    S.jobResult.forEach((r,i)=>{
+      if(r.rewritten) aiDone++;
+      if(r._warn) errCount++;
+      const titleM = r.rewritten ? r.rewritten.match(/★(.+?)★/) : null;
+      const title = titleM ? titleM[0] : (r.rewritten||r.original).slice(0,40)+'...';
+      cardsEl.innerHTML += `
+        <div class="job-card" onclick="selectCard(this,${i},'job')">
+          <div class="jc-no">${i+1}件目 ${r._warn?`<span class="badge b-red">${r._warn}</span>`:r.rewritten?'<span class="badge b-amber">✨ AI済み</span>':''}</div>
+          <div class="jc-title">${title}</div>
+          <div class="jc-body">${(r.rewritten||r.original).slice(0,200)}</div>
+        </div>`;
+    });
+  }
+
+  document.getElementById('statsArea').style.display = 'grid';
+  document.getElementById('stTotal').textContent = total;
+  document.getElementById('stAddr').textContent = addrDone;
+  document.getElementById('stAI').textContent = aiDone;
+  document.getElementById('stErr').textContent = errCount;
+
+  renderTable();
+}
+
+function renderTable(){
+  const mode = S.mode;
+  let rows=[], heads=[];
+  if(mode==='addr'||mode==='both'){
+    heads = ['No.','都道府県市区町村（丁目まで）','番地','建物名','郵便番号','状態'];
+    rows = S.addrResult.map(r=>[r._no, r.都道府県市区町村, r.番地, r.建物名, r.郵便番号, r._warn]);
+  }
+  if(mode==='job'||mode==='both'){
+    heads = [...heads,'元データ(先頭60字)','リライト後(先頭60字)','状態'];
+    S.jobResult.forEach(r=>rows.push(['', r.original.slice(0,60), (r.rewritten||'').slice(0,60), r._warn]));
+  }
+  document.getElementById('tHead').innerHTML = `<tr>${heads.map(h=>`<th>${h}</th>`).join('')}</tr>`;
+  document.getElementById('tBody').innerHTML = rows.map(r=>`<tr>${r.map((c,i)=>{
+    let cls = '';
+    if(mode==='addr'||mode==='both'){ if(i>=1&&i<=3) cls='td-new'; if(i===5&&c) cls='td-err'; }
+    return `<td class="${cls}" title="${String(c||'').replace(/"/g,'')}">${c||''}</td>`;
+  }).join('')}</tr>`).join('');
+}
+
+function selectCard(el, idx, type){
+  document.querySelectorAll('.job-card').forEach(c=>c.classList.remove('sel'));
+  el.classList.add('sel');
+  const r = type==='addr' ? S.addrResult[idx] : S.jobResult[idx];
+  document.getElementById('sbDetail').style.display='block';
+  const content = document.getElementById('sbDetailContent');
+  if(type==='addr'){
+    content.innerHTML=`<div style="font-size:11px;line-height:2.1;color:var(--text2)">
+      <div><span class="badge b-teal" style="margin-right:6px">D列</span>${r.都道府県市区町村||'未取得'}</div>
+      <div><span class="badge b-purple" style="margin-right:6px">E列</span>${r.番地||'―'}</div>
+      <div><span class="badge b-purple" style="margin-right:6px">F列</span>${r.建物名||'―'}</div>
+      <div><span class="badge b-amber" style="margin-right:6px">郵便番号</span>${r.郵便番号||'未取得'}</div>
+      ${r._warn?`<div style="color:var(--danger);margin-top:6px;font-size:11px">⚠ ${r._warn}</div>`:''}
+    </div>`;
+  } else {
+    content.innerHTML=`<div style="font-size:11px">
+      <div class="sb-label" style="margin-bottom:5px">元データ</div>
+      <div style="color:var(--text3);line-height:1.7;margin-bottom:12px;max-height:90px;overflow:hidden;font-size:11px">${r.original}</div>
+      <div class="sb-label" style="margin-bottom:5px">リライト後</div>
+      <div style="color:var(--text2);line-height:1.7;white-space:pre-wrap;max-height:220px;overflow-y:auto;font-size:11px">${r.rewritten||'(未処理)'}</div>
+      ${r._warn?`<div style="color:var(--danger);margin-top:6px">⚠ ${r._warn}</div>`:''}
+    </div>`;
+  }
+}
+
+// ============================================================
+// DOWNLOAD
+// ============================================================
+function downloadResult(){
+  const wb = XLSX.utils.book_new();
+  const mode = S.mode;
+
+  if((mode==='addr'||mode==='both') && S.addrResult.length){
+    // ヘッダー：出力列名をルールタブと同じ表記に
+    const data = [['お仕事No.','都道府県市区町村（丁目まで）','番地','建物名','郵便番号','状態']];
+    S.addrResult.forEach(r=>data.push([r._no, r.都道府県市区町村, r.番地, r.建物名, r.郵便番号, r._warn]));
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    // 要確認行を黄色ハイライト
+    S.addrResult.forEach((r,i)=>{
+      if(r._warn){
+        const rowIdx = i+2; // 1-indexed + header
+        ['A','B','C','D','E','F'].forEach(col=>{
+          const cellRef = col+rowIdx;
+          if(ws[cellRef]) ws[cellRef].s = {fill:{fgColor:{rgb:'FFFF00'}}};
+        });
+      }
+    });
+    XLSX.utils.book_append_sheet(wb, ws, '住所分割結果');
+  }
+  if((mode==='job'||mode==='both') && S.jobResult.length){
+    const data = [['仕事内容（元データ）','仕事内容（最適化後）','状態']];
+    S.jobResult.forEach(r=>data.push([r.original, r.rewritten||'', r._warn]));
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    XLSX.utils.book_append_sheet(wb, ws, '仕事内容最適化結果');
+  }
+
+  const date = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `求人データ最適化_${date}.xlsx`);
+  toast('⬇','Excelファイルをダウンロードしました');
+}
+
+// ============================================================
+// UI HELPERS
+// ============================================================
+function goStep(n){
+  if(n>1 && !S.addrWB && !S.jobWB){ toast('⚠️','先にファイルを読み込むかサンプルを選択してください'); return; }
+  [1,2,3,4].forEach(i=>{
+    document.getElementById('page'+i).classList.toggle('active', i===n);
+    const tab = document.getElementById('tab'+i);
+    tab.classList.remove('active','done');
+    if(i===n) tab.classList.add('active');
+    else if(i<n) tab.classList.add('done');
+    const tn = document.getElementById('tn'+i);
+    tn.textContent = i<n ? '✓' : i;
+  });
+  // Show/hide settings panels
+  if(n===3){
+    const m = S.mode;
+    document.getElementById('addrSettings').style.display = (m==='addr'||m==='both') ? 'block':'none';
+    document.getElementById('aiSettings').style.display   = (m==='job'||m==='both')  ? 'block':'none';
+  }
+}
+
+function setView(v){
+  S.viewMode = v;
+  document.getElementById('cardView').style.display  = v==='card'  ? 'block':'none';
+  document.getElementById('tableView').style.display = v==='table' ? 'block':'none';
+  document.getElementById('vCard').classList.toggle('on', v==='card');
+  document.getElementById('vTable').classList.toggle('on', v==='table');
+}
+
+function setProg(done, total, detail){
+  document.getElementById('progText').textContent = `${done} / ${total}`;
+  document.getElementById('progBar').style.width = total ? `${(done/total)*100}%` : '0%';
+  document.getElementById('progDetail').textContent = detail;
+}
+
+}
+
+function updateSidebar(){
+  const parts = [];
+  if(S.addrFile) parts.push(`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span class="badge b-teal">住所</span><span style="font-size:12px;color:var(--text2)">${S.addrFile}</span></div>`);
+  if(S.jobFile)  parts.push(`<div style="display:flex;align-items:center;gap:8px"><span class="badge b-amber">仕事</span><span style="font-size:12px;color:var(--text2)">${S.jobFile}</span></div>`);
+  document.getElementById('sbFileInfo').innerHTML = parts.length ? parts.join('') : '<div class="empty">ファイル未読み込み</div>';
+}
+
+function updateSidebarRules(){
+  const f = FMT[S.fmt];
+  document.getElementById('sbRuleLabel').textContent = `住所ルール（${f.label}）`;
+  document.getElementById('sbRuleOut1').innerHTML = `<span class="badge b-purple">${f.outCityTown.split('（')[0]}</span>${f.outCityTown}`;
+  document.getElementById('sbRuleOut2').innerHTML = `<span class="badge b-purple">${f.outBanchi.split('（')[0]}</span>${f.outBanchi}`;
+  document.getElementById('sbRuleOut3').innerHTML = `<span class="badge b-purple">${f.outBuilding.split('（')[0]}</span>${f.outBuilding}`;
+  const extra = S.fmt==='circus'
+    ? '<span class="badge b-amber">優先</span>優先度1(B〜D列)→2(E列)→3(F列)'
+    : S.fmt==='jobati'
+    ? '<span class="badge b-amber">注意</span>末尾ハイフン・エリア表記を除去'
+    : '<span class="badge b-amber">参考</span>C列優先、空の場合B列を使用';
+  document.getElementById('sbRuleExtra').innerHTML = `<div class="rule-line">${extra}</div>`;
+}
+
+// スプシに貼り戻す用のTSVをクリップボードにコピー
+function copyResultTSV(){
+  const mode = S.mode;
+  const lines = [];
+
+  if(mode==='addr'||mode==='both'){
+    lines.push(['お仕事No.','都道府県市区町村（丁目まで）','番地','建物名','郵便番号','状態'].join('\t'));
+    S.addrResult.forEach(r => lines.push([r._no, r.都道府県市区町村, r.番地, r.建物名, r.郵便番号, r._warn].join('\t')));
+  }
+  if(mode==='job'||mode==='both'){
+    lines.push(['仕事内容（元データ）','仕事内容（最適化後）','状態'].join('\t'));
+    S.jobResult.forEach(r => lines.push([r.original, r.rewritten||'', r._warn].join('\t')));
+  }
+
+  const tsv = lines.join('\n');
+  navigator.clipboard.writeText(tsv).then(()=>{
+    toast('📋', `${lines.length-1}件をコピーしました！スプシに貼り付けてください`);
+    const btn = document.getElementById('copyTsvBtn');
+    btn.textContent = '✅ コピー完了！';
+    setTimeout(()=>{ btn.textContent = '📋 スプシに貼り戻す用コピー'; }, 3000);
+  }).catch(()=>{
+    toast('⚠️', 'クリップボードへのアクセスが拒否されました');
+  });
+}
+
+
+  const t=document.getElementById('toast');
+  document.getElementById('toastIcon').textContent=icon;
+  document.getElementById('toastMsg').textContent=msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),3000);
+}
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+</script>
+</body>
+</html>
