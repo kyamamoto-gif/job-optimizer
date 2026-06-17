@@ -1406,11 +1406,15 @@ function renderStep4(){
   cardsEl.innerHTML = '';
 
   if(mode==='addr'||mode==='both'){
-    total += S.addrResult.length;
+    total += S.addrResult.filter(r=>!r._empty).length;
     S.addrResult.forEach((r,i)=>{
+      // ② 空白行はグレーの区切り線として表示
+      if(r._empty){
+        cardsEl.innerHTML += `<div style="border-top:1px dashed var(--border);margin:6px 0;opacity:.4"></div>`;
+        return;
+      }
       if(r.都道府県市区町村) addrDone++;
       if(r._warn) errCount++;
-      // D列から都道府県だけ表示用に抽出
       const prefDisp = r.都道府県市区町村.match(/^(東京都|北海道|大阪府|京都府|.{2,3}県)/);
       const p = prefDisp ? prefDisp[1] : '';
       const ct = prefDisp ? r.都道府県市区町村.slice(p.length) : r.都道府県市区町村;
@@ -1457,7 +1461,8 @@ function renderTable(){
   let rows=[], heads=[];
   if(mode==='addr'||mode==='both'){
     heads = ['No.','都道府県市区町村（丁目まで）','番地','建物名','郵便番号','状態'];
-    rows = S.addrResult.map(r=>[r._no, r.都道府県市区町村, r.番地, r.建物名, r.郵便番号, r._warn]);
+    // ② 空白行も空行として含める
+    rows = S.addrResult.map(r=> r._empty ? ['','','','','',''] : [r._no, r.都道府県市区町村, r.番地, r.建物名, r.郵便番号, r._warn]);
   }
   if(mode==='job'||mode==='both'){
     heads = [...heads,'元データ(先頭60字)','リライト後(先頭60字)','状態'];
@@ -1504,19 +1509,20 @@ function downloadResult(){
   const mode = S.mode;
 
   if((mode==='addr'||mode==='both') && S.addrResult.length){
-    // ヘッダー：出力列名をルールタブと同じ表記に
     const data = [['お仕事No.','都道府県市区町村（丁目まで）','番地','建物名','郵便番号','状態']];
-    S.addrResult.forEach(r=>data.push([r._no, r.都道府県市区町村, r.番地, r.建物名, r.郵便番号, r._warn]));
+    // ② 空白行も空行としてExcelに出力
+    S.addrResult.forEach(r=>{
+      if(r._empty){ data.push(['','','','','','']); return; }
+      data.push([r._no, r.都道府県市区町村, r.番地, r.建物名, r.郵便番号, r._warn]);
+    });
     const ws = XLSX.utils.aoa_to_sheet(data);
-    // 要確認行を黄色ハイライト
     S.addrResult.forEach((r,i)=>{
-      if(r._warn){
-        const rowIdx = i+2; // 1-indexed + header
-        ['A','B','C','D','E','F'].forEach(col=>{
-          const cellRef = col+rowIdx;
-          if(ws[cellRef]) ws[cellRef].s = {fill:{fgColor:{rgb:'FFFF00'}}};
-        });
-      }
+      if(r._empty || !r._warn) return;
+      const rowIdx = i+2;
+      ['A','B','C','D','E','F'].forEach(col=>{
+        const cellRef = col+rowIdx;
+        if(ws[cellRef]) ws[cellRef].s = {fill:{fgColor:{rgb:'FFFF00'}}};
+      });
     });
     XLSX.utils.book_append_sheet(wb, ws, '住所分割結果');
   }
@@ -1596,7 +1602,10 @@ function copyResultTSV(){
 
   if(mode==='addr'||mode==='both'){
     lines.push(['お仕事No.','都道府県市区町村（丁目まで）','番地','建物名','郵便番号','状態'].join('\t'));
-    S.addrResult.forEach(r => lines.push([r._no, r.都道府県市区町村, r.番地, r.建物名, r.郵便番号, r._warn].join('\t')));
+    S.addrResult.forEach(r => {
+      if(r._empty){ lines.push(''); return; } // ② 空白行はそのまま空行
+      lines.push([r._no, r.都道府県市区町村, r.番地, r.建物名, r.郵便番号, r._warn].join('\t'));
+    });
   }
   if(mode==='job'||mode==='both'){
     lines.push(['仕事内容（元データ）','仕事内容（最適化後）','状態'].join('\t'));
