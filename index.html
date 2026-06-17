@@ -931,7 +931,11 @@ async function processAddr(){
 
   for(let i=0; i<dataRows.length; i++){
     const row = dataRows[i];
-    if(!row || row.every(c=>c===''||c===null||c===undefined)) continue;
+    // ② 空白行は空のまま出力に含める（新規と更新の間の区切り行を保持）
+    if(!row || row.every(c=>c===''||c===null||c===undefined)){
+      S.addrResult.push({_no:'', 都道府県市区町村:'', 番地:'', 建物名:'', 郵便番号:'', _warn:'', _empty:true});
+      continue;
+    }
     setProg(i+1, dataRows.length, `[${fmt.label}] 住所分割中: 行${i+1}`);
 
     const no = String(row[fmt.noCol]||'').trim();
@@ -1169,21 +1173,21 @@ function extractAddrLineFromText(text, hintPref, hintCity){
 // ■ 前処理：全角→半角、ハイフン統一、漢数字丁目変換、郵便番号除去
 function preprocess(s){
   if(!s) return '';
-  return s
-    // 全角英数字→半角
+  s = s
     .replace(/[Ａ-Ｚａ-ｚ０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
-    // 全角ハイフン系→半角
     .replace(/[－―‐ー−]/g, '-')
-    // 漢数字丁目→算用数字（一〜十まで対応）
     .replace(/十([一二三四五六七八九])丁目/g, (_,c) => (10+'一二三四五六七八九'.indexOf(c)+1)+'丁目')
     .replace(/十丁目/g, '10丁目')
     .replace(/[一二三四五六七八九]丁目/g, m => ('一二三四五六七八九'.indexOf(m[0])+1)+'丁目')
-    // 末尾のハイフン除去
     .replace(/-+$/, '')
-    // 郵便番号除去（〒xxx-xxxx または 〒xxxxxxx）
     .replace(/〒\s*\d{3}-\d{4}\s*/g, '')
     .replace(/〒\s*\d{7}\s*/g, '')
+    // ④ 「本社住所：」「【本社】」等のプレフィックス除去
+    .replace(/^【[^】]*】\s*/, '')
+    .replace(/^（[^）]*）\s*/, '')
+    .replace(/^(?:本社|東京本社|大阪本社|本部|支社|支店|営業所)[：:　\s]*/, '')
     .trim();
+  return s;
 }
 
 // E列・F列のテキストから「都道府県＋市区町村＋番地が含まれる行」を抽出
@@ -1229,7 +1233,10 @@ function parseAddressDetail(addr, hintPref, hintCity){
   // --- 都道府県を抽出 ---
   const prefM = addr.match(/^(東京都|北海道|大阪府|京都府|.{2,3}県)/);
   let pref = prefM ? prefM[1] : (hintPref||'');
-  let rest = prefM ? addr.slice(pref.length) : (hintPref ? addr.replace(new RegExp('^'+hintPref.replace(/[都道府県]/,'')), '') : addr);
+  let rest = prefM ? addr.slice(pref.length)
+    : (hintPref ? addr.replace(new RegExp('^'+hintPref.replace(/[都道府県]/g,'')), '') : addr);
+  // ③ 都道府県が取れなかった場合、hintPrefで補完（市区町村から始まるケース）
+  if(!pref && hintPref) pref = hintPref;
 
   // --- 市区町村＋丁目まで抽出 ---
   // 丁目がある場合：〇〇市〇〇区〇〇町3丁目 まで
@@ -1276,8 +1283,18 @@ function parseAddressDetail(addr, hintPref, hintCity){
       building = splitRes.building;
     }
   }
-  // 「N番地」「N番N号」形式 → そのままE列に
-  else if(restAfterCity.match(/^\d+番(地|\d+号?)?/)){
+  // ① 「N番地M」形式 → 「N番地M」をまとめて番地として扱う（Mを建物扱いしない）
+  else if(restAfterCity.match(/^\d+番地\d*/)){
+    const banchiM = restAfterCity.match(/^(\d+番地\d*)([\s　](.*))?$/);
+    if(banchiM){
+      banchi   = banchiM[1].trim();
+      building = (banchiM[3]||'').trim();
+    } else {
+      banchi = restAfterCity; building = '';
+    }
+  }
+  // 「N番N号」形式
+  else if(restAfterCity.match(/^\d+番\d+号?/)){
     const splitRes = splitBanchiBuilding(restAfterCity);
     banchi   = splitRes.banchi;
     building = splitRes.building;
