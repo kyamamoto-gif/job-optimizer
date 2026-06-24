@@ -185,6 +185,7 @@ tr:hover td{background:rgba(129,140,248,.04)}
   <div class="tab" id="tab2" onclick="goStep(2)"><div class="tnum" id="tn2">2</div>処理モード選択</div>
   <div class="tab" id="tab3" onclick="goStep(3)"><div class="tnum" id="tn3">3</div>設定・実行</div>
   <div class="tab" id="tab4" onclick="goStep(4)"><div class="tnum" id="tn4">4</div>プレビュー・ダウンロード</div>
+  <div class="tab" id="tabZip" onclick="goZipTool()" style="margin-left:auto;border-left:1px solid var(--border);padding-left:20px">〒 郵便番号付与ツール</div>
 </div>
 
 <div class="layout">
@@ -432,19 +433,6 @@ tr:hover td{background:rgba(129,140,248,.04)}
     <div class="stat"><div class="stat-val" style="color:var(--accent)" id="stErr">0</div><div class="stat-lbl">要確認</div></div>
   </div>
 
-  <!-- サーカス形式専用：郵便番号後付け入力エリア -->
-  <div id="circusZipArea" style="display:none" class="card" style="margin-bottom:16px">
-    <div class="card-title">〒 郵便番号を後付け入力（サーカス形式）</div>
-    <div class="txt-sm" style="margin-bottom:10px">
-      住所を目視確認後、スプシのA列（お仕事No.）・B列（郵便番号）をコピーして貼り付けてください
-    </div>
-    <textarea id="circusZipPaste" placeholder="A列（お仕事No.）とB列（郵便番号）をスプシからコピペ&#10;例：&#10;113904	564-0052&#10;113954	110-0008" style="min-height:100px;font-family:'DM Mono',monospace;font-size:11px"></textarea>
-    <div class="btn-row" style="margin-top:10px">
-      <button class="btn btn-primary" onclick="applyCircusZip()">〒 郵便番号を適用</button>
-      <div id="circusZipStatus" class="txt-xs" style="align-self:center"></div>
-    </div>
-  </div>
-
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
     <div class="pg-title" style="margin-bottom:0">結果プレビュー</div>
     <div style="display:flex;gap:10px;align-items:center">
@@ -466,6 +454,95 @@ tr:hover td{background:rgba(129,140,248,.04)}
 </div>
 
 </div><!-- /main -->
+
+<!-- ===== ZIP TOOL PAGE ===== -->
+<div class="page" id="pageZip" style="display:none;flex:1;overflow-y:auto;padding:28px 32px">
+  <div class="pg-title">〒 郵便番号付与ツール</div>
+  <div class="pg-sub">A列：都道府県市区町村、B列：番地、C列：建物名 のデータに郵便番号を自動付与します</div>
+
+  <!-- 入力方式 -->
+  <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:16px;width:fit-content">
+    <button class="vt-btn on" id="zipTabPaste" onclick="switchZipTab('paste')" style="padding:10px 22px;font-size:13px">📋 スプシからコピペ</button>
+    <button class="vt-btn" id="zipTabFile" onclick="switchZipTab('file')" style="padding:10px 22px;font-size:13px">📁 Excelアップロード</button>
+  </div>
+
+  <!-- コピペ入力 -->
+  <div id="zipPasteArea">
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-title">📋 住所データを貼り付け</div>
+      <div class="txt-sm" style="margin-bottom:8px">
+        <strong>A列：都道府県市区町村</strong>・<strong>B列：番地</strong>・<strong>C列：建物名（任意）</strong><br>
+        スプシで対象列を選択してコピー（Ctrl+C）→ 下に貼り付け（Ctrl+V）
+      </div>
+      <textarea id="zipPasteInput" placeholder="例：&#10;東京都新宿区新宿3丁目	1-13	新宿ビル5F&#10;大阪府大阪市中央区本町3丁目	4-8	農林会館602&#10;長野県安曇野市穂高	字浅湖4112-1	"
+        style="min-height:140px;font-family:'DM Mono',monospace;font-size:11px"
+        oninput="onZipPasteInput()"></textarea>
+      <div id="zipPastePreview" class="txt-xs mt8" style="color:var(--accent2)"></div>
+    </div>
+  </div>
+
+  <!-- Excelアップロード -->
+  <div id="zipFileArea" style="display:none">
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-title">📁 Excelファイルをアップロード</div>
+      <div class="txt-sm" style="margin-bottom:8px">A列：都道府県市区町村、B列：番地、C列：建物名（任意）の形式</div>
+      <div class="file-slot" id="zipFileSlot" onclick="triggerFile('zipFileInput')"
+        ondragover="event.preventDefault();this.classList.add('drag')"
+        ondragleave="this.classList.remove('drag')"
+        ondrop="dropZipFile(event)" style="text-align:center;padding:20px">
+        <div class="slot-icon">📍</div>
+        <div class="slot-name">Excelファイルを選択</div>
+        <div class="slot-file" id="zipFileName">未選択</div>
+      </div>
+      <input type="file" id="zipFileInput" accept=".xlsx" style="display:none" onchange="loadZipFile(event)">
+    </div>
+  </div>
+
+  <!-- 設定 -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-title">⚙️ 設定</div>
+    <div class="row-2">
+      <div class="field">
+        <div class="field-label">ヘッダー行数</div>
+        <select id="zipHeaderRows">
+          <option value="0">なし（1行目からデータ）</option>
+          <option value="1" selected>1行</option>
+          <option value="2">2行</option>
+        </select>
+      </div>
+      <div class="field">
+        <div class="field-label">取得できない行</div>
+        <select id="zipMissing">
+          <option value="empty">空欄のまま</option>
+          <option value="warn" selected>⚠️ 要確認フラグ</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-primary btn-lg" id="zipRunBtn" onclick="runZipTool()" disabled>〒 郵便番号を付与</button>
+  </div>
+
+  <!-- 結果 -->
+  <div id="zipResultArea" style="display:none;margin-top:24px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div style="font-size:15px;font-weight:500">結果</div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-success" onclick="downloadZipResult()">⬇ Excelダウンロード</button>
+        <button class="btn btn-outline" onclick="copyZipResultTSV()" id="copyZipTsvBtn">📋 スプシに貼り戻す用コピー</button>
+      </div>
+    </div>
+    <div id="zipStats" class="stats" style="margin-bottom:16px">
+      <div class="stat"><div class="stat-val" id="zipStTotal">0</div><div class="stat-lbl">総件数</div></div>
+      <div class="stat"><div class="stat-val" style="color:var(--accent2)" id="zipStFound">0</div><div class="stat-lbl">取得成功</div></div>
+      <div class="stat"><div class="stat-val" style="color:var(--danger)" id="zipStMiss">0</div><div class="stat-lbl">取得失敗</div></div>
+    </div>
+    <div class="tbl-wrap">
+      <table><thead id="zipTHead"></thead><tbody id="zipTBody"></tbody></table>
+    </div>
+  </div>
+</div>
 
 <!-- ===== SIDEBAR ===== -->
 <div class="sidebar">
@@ -928,8 +1005,6 @@ async function runProcess(){
   document.getElementById('progressArea').style.display = 'none';
   document.getElementById('runBtn').disabled = false;
   renderStep4();
-  // サーカス形式は郵便番号後付けエリアを表示
-  document.getElementById('circusZipArea').style.display = (S.fmt==='circus' && (S.mode==='addr'||S.mode==='both')) ? 'block' : 'none';
   goStep(4);
   toast('✅', '処理が完了しました！');
 }
@@ -1061,8 +1136,8 @@ async function processAddr(){
       }
     }
 
-    // 郵便番号をKEN_ALLから取得（サーカス形式は後付け入力のため自動取得しない）
-    if(!zip && S.kenLoaded && S.fmt !== 'circus') zip = lookupZip(cityTown, banchi);
+    // 郵便番号をKEN_ALLから取得
+    if(!zip && S.kenLoaded) zip = lookupZip(cityTown, banchi);
     const zipWarn = (cityTown && !zip) ? '郵便番号未取得' : '';
     if(zipWarn && warn) warn += '・' + zipWarn;
     else if(zipWarn) warn = zipWarn;
@@ -1653,6 +1728,137 @@ function applyCircusZip(){
   document.getElementById('circusZipArea').style.display = 'block';
 }
 
+
+// ============================================================
+// 郵便番号付与ツール
+// ============================================================
+let zipToolRows = [];
+
+function goZipTool(){
+  [1,2,3,4].forEach(i=>{
+    document.getElementById('page'+i).classList.remove('active');
+    document.getElementById('tab'+i).classList.remove('active','done');
+  });
+  document.getElementById('pageZip').style.display = 'block';
+  document.getElementById('tabZip').classList.add('active');
+}
+
+function switchZipTab(tab){
+  document.getElementById('zipTabPaste').classList.toggle('on', tab==='paste');
+  document.getElementById('zipTabFile').classList.toggle('on', tab==='file');
+  document.getElementById('zipPasteArea').style.display  = tab==='paste' ? 'block':'none';
+  document.getElementById('zipFileArea').style.display   = tab==='file'  ? 'block':'none';
+}
+
+function onZipPasteInput(){
+  const text = document.getElementById('zipPasteInput').value;
+  const rows = parseTSV(text).filter(r => r.some(c=>c.trim()));
+  zipToolRows = rows;
+  const hdr = parseInt(document.getElementById('zipHeaderRows').value||'1');
+  const dataCount = Math.max(0, rows.length - hdr);
+  document.getElementById('zipPastePreview').textContent = rows.length ? `✅ ${dataCount}件を検出` : '';
+  document.getElementById('zipRunBtn').disabled = rows.length === 0;
+}
+
+function loadZipFile(ev){
+  const file = ev.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const wb = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    zipToolRows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+    document.getElementById('zipFileName').textContent = file.name;
+    document.getElementById('zipFileSlot').classList.add('loaded');
+    document.getElementById('zipRunBtn').disabled = false;
+    toast('📍', `${file.name} を読み込みました`);
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function dropZipFile(ev){
+  ev.preventDefault();
+  ev.currentTarget.classList.remove('drag');
+  const file = ev.dataTransfer.files[0];
+  if(file) loadZipFile({target:{files:[file]}});
+}
+
+function runZipTool(){
+  if(!S.kenLoaded){ toast('⚠️','KEN_ALL.CSVが読み込まれていません'); return; }
+  if(!zipToolRows.length){ toast('⚠️','データを入力してください'); return; }
+
+  const hdrRows = parseInt(document.getElementById('zipHeaderRows').value||'1');
+  const warnMissing = document.getElementById('zipMissing').value === 'warn';
+  const dataRows = zipToolRows.slice(hdrRows);
+
+  const results = [];
+  let found = 0, miss = 0;
+
+  dataRows.forEach(row => {
+    if(!row || row.every(c=>!String(c||'').trim())){
+      results.push({cityTown:'', banchi:'', building:'', zip:'', warn:''});
+      return;
+    }
+    const cityTown = String(row[0]||'').trim();
+    const banchi   = String(row[1]||'').trim();
+    const building = String(row[2]||'').trim();
+    const zip = lookupZip(cityTown, banchi);
+    const warn = (!zip && cityTown && warnMissing) ? '要確認（郵便番号未取得）' : '';
+    if(zip) found++; else if(cityTown) miss++;
+    results.push({cityTown, banchi, building, zip, warn});
+  });
+
+  document.getElementById('zipStTotal').textContent = results.filter(r=>r.cityTown).length;
+  document.getElementById('zipStFound').textContent = found;
+  document.getElementById('zipStMiss').textContent  = miss;
+  document.getElementById('zipTHead').innerHTML = '<tr><th>都道府県市区町村</th><th>番地</th><th>建物名</th><th style="color:var(--accent2)">郵便番号</th><th>状態</th></tr>';
+  document.getElementById('zipTBody').innerHTML = results.map(r=>`
+    <tr>
+      <td title="${r.cityTown}">${r.cityTown||''}</td>
+      <td>${r.banchi}</td>
+      <td>${r.building}</td>
+      <td style="color:${r.zip?'var(--accent2)':'var(--danger)'};font-family:'DM Mono',monospace">${r.zip||'―'}</td>
+      <td style="color:var(--danger);font-size:11px">${r.warn}</td>
+    </tr>`).join('');
+
+  document.getElementById('zipResultArea').style.display = 'block';
+  document.getElementById('zipResultArea').scrollIntoView({behavior:'smooth'});
+  S._zipResults = results;
+  toast('✅', `${found}件の郵便番号を付与しました`);
+}
+
+function downloadZipResult(){
+  if(!S._zipResults) return;
+  const wb = XLSX.utils.book_new();
+  const data = [['都道府県市区町村','番地','建物名','郵便番号','状態']];
+  S._zipResults.forEach(r => data.push([r.cityTown, r.banchi, r.building, r.zip, r.warn]));
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  S._zipResults.forEach((r,i) => {
+    if(!r.warn) return;
+    ['A','B','C','D','E'].forEach(col=>{
+      const ref = col+(i+2);
+      if(ws[ref]) ws[ref].s = {fill:{fgColor:{rgb:'FFFF00'}}};
+    });
+  });
+  XLSX.utils.book_append_sheet(wb, ws, '郵便番号付与結果');
+  XLSX.writeFile(wb, `郵便番号付与結果_${new Date().toISOString().slice(0,10)}.xlsx`);
+  toast('⬇','Excelをダウンロードしました');
+}
+
+function copyZipResultTSV(){
+  if(!S._zipResults) return;
+  const lines = [['都道府県市区町村','番地','建物名','郵便番号','状態'].join('\t')];
+  S._zipResults.forEach(r => {
+    if(!r.cityTown && !r.banchi){ lines.push(''); return; }
+    lines.push([r.cityTown, r.banchi, r.building, r.zip, r.warn].join('\t'));
+  });
+  navigator.clipboard.writeText(lines.join('\n')).then(()=>{
+    toast('📋', `${S._zipResults.length}件をコピーしました`);
+    const btn = document.getElementById('copyZipTsvBtn');
+    btn.textContent = '✅ コピー完了！';
+    setTimeout(()=>{ btn.textContent = '📋 スプシに貼り戻す用コピー'; }, 3000);
+  }).catch(()=>toast('⚠️','クリップボードアクセスが拒否されました'));
+}
 
 function copyResultTSV(){
   const mode = S.mode;
