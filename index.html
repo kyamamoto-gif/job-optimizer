@@ -432,6 +432,19 @@ tr:hover td{background:rgba(129,140,248,.04)}
     <div class="stat"><div class="stat-val" style="color:var(--accent)" id="stErr">0</div><div class="stat-lbl">要確認</div></div>
   </div>
 
+  <!-- サーカス形式専用：郵便番号後付け入力エリア -->
+  <div id="circusZipArea" style="display:none" class="card" style="margin-bottom:16px">
+    <div class="card-title">〒 郵便番号を後付け入力（サーカス形式）</div>
+    <div class="txt-sm" style="margin-bottom:10px">
+      住所を目視確認後、スプシのA列（お仕事No.）・B列（郵便番号）をコピーして貼り付けてください
+    </div>
+    <textarea id="circusZipPaste" placeholder="A列（お仕事No.）とB列（郵便番号）をスプシからコピペ&#10;例：&#10;113904	564-0052&#10;113954	110-0008" style="min-height:100px;font-family:'DM Mono',monospace;font-size:11px"></textarea>
+    <div class="btn-row" style="margin-top:10px">
+      <button class="btn btn-primary" onclick="applyCircusZip()">〒 郵便番号を適用</button>
+      <div id="circusZipStatus" class="txt-xs" style="align-self:center"></div>
+    </div>
+  </div>
+
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
     <div class="pg-title" style="margin-bottom:0">結果プレビュー</div>
     <div style="display:flex;gap:10px;align-items:center">
@@ -440,7 +453,7 @@ tr:hover td{background:rgba(129,140,248,.04)}
         <button class="vt-btn" id="vTable" onclick="setView('table')">テーブル</button>
       </div>
       <button class="btn btn-success" onclick="downloadResult()">⬇ Excelダウンロード</button>
-          <button class="btn btn-outline" onclick="copyResultTSV()" id="copyTsvBtn">📋 スプシに貼り戻す用コピー</button>
+      <button class="btn btn-outline" onclick="copyResultTSV()" id="copyTsvBtn">📋 スプシに貼り戻す用コピー</button>
     </div>
   </div>
 
@@ -915,6 +928,8 @@ async function runProcess(){
   document.getElementById('progressArea').style.display = 'none';
   document.getElementById('runBtn').disabled = false;
   renderStep4();
+  // サーカス形式は郵便番号後付けエリアを表示
+  document.getElementById('circusZipArea').style.display = (S.fmt==='circus' && (S.mode==='addr'||S.mode==='both')) ? 'block' : 'none';
   goStep(4);
   toast('✅', '処理が完了しました！');
 }
@@ -1046,8 +1061,8 @@ async function processAddr(){
       }
     }
 
-    // 郵便番号をKEN_ALLから取得（サーカス形式は既存J列優先）
-    if(!zip && S.kenLoaded) zip = lookupZip(cityTown, banchi);
+    // 郵便番号をKEN_ALLから取得（サーカス形式は後付け入力のため自動取得しない）
+    if(!zip && S.kenLoaded && S.fmt !== 'circus') zip = lookupZip(cityTown, banchi);
     const zipWarn = (cityTown && !zip) ? '郵便番号未取得' : '';
     if(zipWarn && warn) warn += '・' + zipWarn;
     else if(zipWarn) warn = zipWarn;
@@ -1182,9 +1197,10 @@ function preprocess(s){
     .replace(/-+$/, '')
     .replace(/〒\s*\d{3}-\d{4}\s*/g, '')
     .replace(/〒\s*\d{7}\s*/g, '')
-    // ④ 「本社住所：」「【本社】」等のプレフィックス除去
+    // ④ プレフィックス除去（本社/支社/〇〇本社/ など）
     .replace(/^【[^】]*】\s*/, '')
     .replace(/^（[^）]*）\s*/, '')
+    .replace(/^[^都道府県市区町村]*?(?:本社|支社|支店|営業所|本部)[^/／]*[/／]\s*/, '')
     .replace(/^(?:本社|東京本社|大阪本社|本部|支社|支店|営業所)[：:　\s]*/, '')
     .trim();
   return s;
@@ -1260,6 +1276,15 @@ function parseAddressDetail(addr, hintPref, hintCity){
     }
   }
 
+  // 「字〇〇」「第〇〇」が先頭にある場合は番地欄の先頭に付ける
+  // 例: 「字浅湖4112-1」→ 番地「字浅湖4112-1」、「第2地割3番」→ 番地「第2地割3番」
+  let azaPrefix = '';
+  const azaM = restAfterCity.match(/^((?:字|第)[^\d\s　]{0,10})/);
+  if(azaM){
+    azaPrefix = azaM[1];
+    restAfterCity = restAfterCity.slice(azaM[1].length).trim();
+  }
+
   // --- 番地とE列のルール適用 ---
   // restAfterCity の先頭が番地部分
   let banchi = '', building = '';
@@ -1314,7 +1339,7 @@ function parseAddressDetail(addr, hintPref, hintCity){
   return {
     cityTown: cityTown.trim(),
     cityOnly: (hintCity||''),
-    banchi:   banchi.trim(),
+    banchi:   (azaPrefix + banchi).trim(),
     building: building.trim()
   };
 }
@@ -1595,7 +1620,40 @@ function updateSidebarRules(){
   document.getElementById('sbRuleExtra').innerHTML = `<div class="rule-line">${extra}</div>`;
 }
 
-// スプシに貼り戻す用のTSVをクリップボードにコピー
+// サーカス形式の郵便番号後付け適用
+function applyCircusZip(){
+  const text = document.getElementById('circusZipPaste').value.trim();
+  if(!text){ toast('⚠️','データを貼り付けてください'); return; }
+
+  // TSV（No. \t 郵便番号）をパース
+  const zipMap = new Map();
+  text.split('\n').forEach(line => {
+    const cols = line.split('\t');
+    if(cols.length >= 2){
+      const no  = cols[0].trim();
+      let zip   = cols[1].trim().replace(/〒/g,'').replace(/[－―‐]/g,'-').trim();
+      if(no && zip) zipMap.set(String(no), zip);
+    }
+  });
+
+  // addrResultのNoと突合して郵便番号をセット
+  let matched = 0;
+  S.addrResult.forEach(r => {
+    if(r._empty) return;
+    const no = String(r._no||'').trim();
+    if(zipMap.has(no)){
+      r.郵便番号 = zipMap.get(no);
+      matched++;
+    }
+  });
+
+  document.getElementById('circusZipStatus').textContent = `✅ ${matched}件に郵便番号を適用しました`;
+  toast('〒', `${matched}件の郵便番号を適用しました`);
+  renderStep4();
+  document.getElementById('circusZipArea').style.display = 'block';
+}
+
+
 function copyResultTSV(){
   const mode = S.mode;
   const lines = [];
