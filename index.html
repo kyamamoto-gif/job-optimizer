@@ -1054,13 +1054,21 @@ async function processAddr(){
       }
 
       // 700形式：C列（優先度1）を使い、空または取得失敗ならD列（優先度2）にフォールバック
+      // B列（都道府県ヒント）があれば補完に使う
+      const hintPref700 = S.fmt === '700' ? preprocess(String(row[1]||'').trim()) : '';
       let src = mainAddr;
-      let parsed = src ? parseAddressDetail(src,'','') : null;
+      let parsed = src ? parseAddressDetail(src, hintPref700, '') : null;
 
       // C列で都道府県が取れなかった場合 → D列を試みる
       if(S.fmt === '700' && (!parsed || !parsed.cityTown) && subAddr){
         src = subAddr;
-        parsed = parseAddressDetail(src,'','');
+        parsed = parseAddressDetail(src, hintPref700, '');
+      }
+
+      // D列でも取れなかった場合でもB列でフォールバック補完
+      if(parsed && !parsed.cityTown && hintPref700){
+        parsed.cityTown = hintPref700 + (parsed.banchi||'');
+        parsed.banchi = '';
       }
 
       if(parsed && parsed.cityTown){
@@ -1272,10 +1280,16 @@ function preprocess(s){
     .replace(/-+$/, '')
     .replace(/〒\s*\d{3}-\d{4}\s*/g, '')
     .replace(/〒\s*\d{7}\s*/g, '')
-    // ④ プレフィックス除去（本社/支社/〇〇本社/ など）
+    // 【本社】（本社）等ブラケット系
     .replace(/^【[^】]*】\s*/, '')
     .replace(/^（[^）]*）\s*/, '')
-    .replace(/^[^都道府県市区町村]*?(?:本社|支社|支店|営業所|本部)[^/／]*[/／]\s*/, '')
+    // 「矢野工場：広島県…」「難波営業所：大阪府…」など コロン区切りで都道府県が来るパターン
+    .replace(/^[^都道府県\n]*?[：:]\s*(?=東京都|北海道|大阪府|京都府|[\S]{2,3}県)/, '')
+    // 「飯田橋本社/東京都…」など スラッシュ区切り
+    .replace(/^[^/／\n]*[/／]\s*(?=東京都|北海道|大阪府|京都府|[\S]{2,3}県)/, '')
+    // 「難波営業所　大阪市…」など 全角/半角スペース区切りで市区町村または都道府県が来るパターン
+    .replace(/^[^\d都道府県市区町村\n]{2,15}[　\s]+(?=(?:東京都|北海道|大阪府|京都府|[\S]{2,3}県|[\S]{1,8}[市区町村]))/, '')
+    // 「本社」「支社」等の単純プレフィックス
     .replace(/^(?:本社|東京本社|大阪本社|本部|支社|支店|営業所)[：:　\s]*/, '')
     .trim();
   return s;
